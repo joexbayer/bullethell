@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Realm Bullet Hell</title>
+    <style>
+      :root {
+        --bg: #d7e4ff;
+        --panel: rgba(245, 249, 255, 0.88);
+        --line: rgba(60, 86, 132, 0.18);
+        --text: #172036;
+        --muted: #486080;
+        --accent-fire: #ff8a3d;
+        --accent-ice: #3fb7ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at top, rgba(255, 210, 153, 0.74), transparent 34%),
+          radial-gradient(circle at bottom, rgba(162, 214, 255, 0.62), transparent 40%),
+          linear-gradient(180deg, #e9f2ff 0%, #d7e4ff 48%, #d1ddf6 100%),
+          var(--bg);
+        color: var(--text);
+        font-family: "IBM Plex Mono", "SF Mono", Menlo, monospace;
+      }
+
+      .shell {
+        width: 100%;
+        min-height: 100vh;
+      }
+
+      .viewport {
+        position: relative;
+        display: grid;
+        place-items: center;
+        padding: 18px;
+      }
+
+      .playfield-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      .playfield {
+        position: relative;
+        width: min(calc(100vw - 36px), calc(100vh - 92px), 980px);
+        height: min(calc(100vw - 36px), calc(100vh - 92px), 980px);
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.68);
+        background:
+          linear-gradient(180deg, rgba(227, 238, 255, 0.22), rgba(122, 158, 209, 0.06)),
+          #8ea7cf;
+        image-rendering: pixelated;
+        box-shadow:
+          0 30px 80px rgba(34, 56, 92, 0.22),
+          0 0 0 8px rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+      }
+
+      .hud-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 24px;
+      }
+
+      .boss-hud,
+      .player-hud {
+        display: grid;
+        gap: 8px;
+      }
+
+      .boss-hud {
+        justify-items: center;
+        gap: 10px;
+      }
+
+      .boss-head,
+      .player-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        width: min(100%, 520px);
+        color: var(--text);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .player-head {
+        width: min(100%, 320px);
+      }
+
+      .objective-row {
+        display: flex;
+        justify-content: center;
+        width: min(100%, 620px);
+      }
+
+      .objective-label {
+        min-width: 180px;
+        text-align: center;
+        padding: 9px 16px;
+        border-radius: 999px;
+        background: rgba(248, 252, 255, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.72);
+        box-shadow: 0 12px 28px rgba(26, 45, 77, 0.12);
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 12px;
+        color: var(--text);
+      }
+
+      .objective-label[data-tone="attack"] {
+        background: rgba(255, 241, 217, 0.96);
+        box-shadow: 0 12px 28px rgba(255, 149, 61, 0.18);
+      }
+
+      .objective-label[data-tone="seal"] {
+        background: rgba(255, 236, 215, 0.97);
+        box-shadow: 0 12px 28px rgba(255, 124, 56, 0.2);
+      }
+
+      .objective-label[data-tone="portal"] {
+        background: rgba(231, 244, 255, 0.97);
+        box-shadow: 0 12px 28px rgba(74, 153, 255, 0.2);
+      }
+
+      .objective-label[data-tone="bird"] {
+        background: rgba(236, 246, 255, 0.97);
+        box-shadow: 0 12px 28px rgba(95, 169, 255, 0.2);
+      }
+
+      .objective-label[data-tone="victory"] {
+        background: rgba(229, 255, 233, 0.97);
+        box-shadow: 0 12px 28px rgba(95, 200, 118, 0.18);
+      }
+
+      .boss-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .boss-state {
+        min-width: 106px;
+        text-align: center;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.34);
+        background: rgba(255, 255, 255, 0.42);
+        color: var(--text);
+        transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+      }
+
+      .boss-state.invulnerable {
+        background: rgba(255, 232, 171, 0.9);
+        box-shadow: 0 0 0 1px rgba(255, 221, 120, 0.45), 0 0 18px rgba(255, 214, 94, 0.28);
+      }
+
+      .boss-state.armored {
+        background: rgba(183, 218, 255, 0.92);
+        box-shadow: 0 0 0 1px rgba(132, 188, 255, 0.45), 0 0 18px rgba(102, 164, 255, 0.22);
+      }
+
+      .bar {
+        width: min(100%, 520px);
+        height: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(255, 255, 255, 0.38);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+      }
+
+      .player-hud .bar {
+        width: min(100%, 320px);
+      }
+
+      .bar-fill {
+        height: 100%;
+        width: 100%;
+        transform-origin: left center;
+      }
+
+      .boss-fill {
+        background: linear-gradient(90deg, #ff7a3a, #ffc35d);
+      }
+
+      .player-fill {
+        background: linear-gradient(90deg, #59d98e, #b4ffcb);
+      }
+
+      .mana-fill {
+        background: linear-gradient(90deg, #5dbdff, #b4e2ff);
+      }
+
+      .prompt-flash {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) scale(0.96);
+        min-width: min(520px, calc(100vw - 96px));
+        max-width: min(700px, calc(100vw - 96px));
+        padding: 16px 22px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        background: rgba(248, 252, 255, 0.90);
+        box-shadow: 0 24px 60px rgba(33, 54, 88, 0.18);
+        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 18px;
+        line-height: 1.4;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .prompt-flash.visible {
+        animation: prompt-flash 1400ms ease-out forwards;
+      }
+
+      .damage-flash {
+        position: absolute;
+        inset: 24px;
+        border-radius: 10px;
+        opacity: 0;
+        pointer-events: none;
+        box-shadow:
+          inset 0 0 0 2px rgba(255, 120, 120, 0.14),
+          inset 0 0 80px 10px rgba(255, 36, 36, 0.18),
+          inset 0 0 160px 30px rgba(184, 0, 0, 0.12);
+      }
+
+      .damage-flash.visible {
+        animation: damage-flash 380ms ease-out forwards;
+      }
+
+      @keyframes prompt-flash {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, -48%) scale(0.92);
+        }
+        10% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+        72% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -52%) scale(1.02);
+        }
+      }
+
+      @keyframes damage-flash {
+        0% {
+          opacity: 0;
+        }
+        18% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+
+      h1, h2, p, ul {
+        margin: 0;
+      }
+
+      .hot {
+        color: var(--accent-fire);
+      }
+
+      .cold {
+        color: var(--accent-ice);
+      }
+
+      code {
+        color: var(--text);
+      }
+
+      .underbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 0 4px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .fps-pill,
+      .controls-line {
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.72);
+        background: rgba(245, 249, 255, 0.82);
+        box-shadow: 0 12px 28px rgba(35, 58, 92, 0.10);
+      }
+
+      .fps-pill {
+        min-width: 92px;
+        padding: 9px 12px;
+        text-align: center;
+        color: var(--text);
+      }
+
+      .controls-line {
+        flex: 1;
+        padding: 9px 14px;
+        text-align: center;
+      }
+
+      @media (max-width: 1100px) {
+        .playfield {
+          width: calc(100vw - 24px);
+          height: calc(100vw - 24px);
+        }
+
+        .underbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="shell" class="shell">
+      <div class="viewport">
+        <div class="playfield-shell">
+          <div class="playfield">
+            <canvas id="game" width="960" height="960"></canvas>
+            <div class="hud-overlay">
+              <div id="damage-flash" class="damage-flash"></div>
+              <div class="boss-hud">
+                <div class="boss-head">
+                  <span class="boss-title">
+                    <span id="boss-name">Twilight Archmage</span>
+                    <span id="boss-state" class="boss-state">Vulnerable</span>
+                  </span>
+                  <span id="boss-hp-label">2400 / 2400</span>
+                </div>
+                <div class="bar">
+                  <div id="boss-bar-fill" class="bar-fill boss-fill"></div>
+                </div>
+                <div class="objective-row">
+                  <span id="objective-label" class="objective-label" data-tone="attack">Attack Boss</span>
+                </div>
+              </div>
+              <div id="prompt-flash" class="prompt-flash"></div>
+              <div class="player-hud">
+                <div class="player-head">
+                  <span>HP</span>
+                  <span id="player-hp-label">500 / 500</span>
+                </div>
+                <div class="bar">
+                  <div id="player-bar-fill" class="bar-fill player-fill"></div>
+                </div>
+                <div class="player-head">
+                  <span>MP</span>
+                  <span id="player-mp-label">180 / 180</span>
+                </div>
+                <div class="bar">
+                  <div id="player-mana-fill" class="bar-fill mana-fill"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="underbar">
+            <div id="fps-pill" class="fps-pill">FPS 60</div>
+            <div class="controls-line">WASD Move  ·  Mouse Aim  ·  Q / E Rotate  ·  Wheel Zoom  ·  Hold LMB Fire</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
