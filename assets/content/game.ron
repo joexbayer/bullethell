@@ -1040,7 +1040,6 @@
             ],
             transitions: [
               (condition: HpBelowRatio(0.70), to_phase: "seal_one"),
-              (condition: PatternCountAtLeast(6), to_phase: "seal_one"),
             ],
           ),
           (
@@ -1140,7 +1139,6 @@
             ],
             transitions: [
               (condition: HpBelowRatio(0.40), to_phase: "seal_two"),
-              (condition: PatternCountAtLeast(2), to_phase: "blizzard_guard"),
             ],
           ),
           (
@@ -1173,7 +1171,6 @@
             ],
             transitions: [
               (condition: HpBelowRatio(0.40), to_phase: "seal_two"),
-              (condition: PatternCountAtLeast(2), to_phase: "seal_two"),
             ],
           ),
           (
@@ -1276,6 +1273,11 @@
             enter_commands: [
               SetGeneratorsVulnerable(false),
               DespawnHelpers,
+              ClearTilesRect(col: 4, row: 4, width: 3, height: 3),
+              ClearTilesRect(col: 17, row: 4, width: 3, height: 3),
+              ClearTilesRect(col: 4, row: 17, width: 3, height: 3),
+              ClearTilesRect(col: 17, row: 17, width: 3, height: 3),
+              SetArenaShake(amplitude: 0.18, frames: 90),
               SpawnHelper(
                 helper_id: "inferno",
                 sprite: 10,
@@ -1298,7 +1300,7 @@
                 bullet_pattern: Some("blizzard_duel_pattern"),
                 color_rgba: (0.72, 0.92, 1.0, 1.0),
               ),
-              SetMessage("Bird duel"),
+              SetMessage("The pillars crumble"),
             ],
             transitions: [
               (condition: HpBelowRatio(0.10), to_phase: "finale"),

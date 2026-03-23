@@ -8,7 +8,7 @@ export interface AtlasBundle {
 export function createAtlas(): AtlasBundle {
   const cols = 4;
   const rows = 4;
-  const cell = 64;
+  const cell = 128;
   const canvas = document.createElement("canvas");
   canvas.width = cols * cell;
   canvas.height = rows * cell;
@@ -18,22 +18,22 @@ export function createAtlas(): AtlasBundle {
   }
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawSprite(ctx, cell, 0, 0, "#5f697d", "tile");
-  drawSprite(ctx, cell, 1, 0, "#ff9f6a", "orb");
-  drawSprite(ctx, cell, 2, 0, "#9eecff", "diamond");
-  drawSprite(ctx, cell, 3, 0, "#ffd879", "square");
-  drawSprite(ctx, cell, 0, 1, "#d0f4ff", "ring");
-  drawSprite(ctx, cell, 1, 1, "#b18dff", "boss");
-  drawSprite(ctx, cell, 2, 1, "#ffffff", "player");
-  drawSprite(ctx, cell, 3, 1, "#d5e4ff", "square");
-  drawSprite(ctx, cell, 0, 2, "#a878ff", "star");
-  drawSprite(ctx, cell, 1, 2, "#b7c3d6", "edge");
-  drawSprite(ctx, cell, 2, 2, "#ff7b57", "spike");
-  drawSprite(ctx, cell, 3, 2, "#7ecfff", "shard");
-  drawSprite(ctx, cell, 0, 3, "#ffd16a", "hex");
-  drawSprite(ctx, cell, 1, 3, "#73ff9f", "ring");
-  drawSprite(ctx, cell, 2, 3, "#ffffff", "ui_rect");
-  drawSprite(ctx, cell, 3, 3, "#ffffff", "ui_rect");
+  drawSprite(ctx, cell, 0, 0, "#5f697d", "tile");       // 0: tile
+  drawSprite(ctx, cell, 1, 0, "#ff9f6a", "orb");        // 1: orb
+  drawSprite(ctx, cell, 2, 0, "#9eecff", "diamond");    // 2: diamond
+  drawSprite(ctx, cell, 3, 0, "#ffd879", "square");     // 3: generator core
+  drawSprite(ctx, cell, 0, 1, "#d0f4ff", "ring");       // 4: ring
+  drawSprite(ctx, cell, 1, 1, "#b18dff", "boss");       // 5: boss
+  drawSprite(ctx, cell, 2, 1, "#ffffff", "player");      // 6: player
+  drawSprite(ctx, cell, 3, 1, "#d5e4ff", "square");     // 7: player shot
+  drawSprite(ctx, cell, 0, 2, "#a878ff", "star");        // 8: star
+  drawSprite(ctx, cell, 1, 2, "#b7c3d6", "edge");       // 9: edge wall
+  drawSprite(ctx, cell, 2, 2, "#ff7b57", "spike");      // 10: spike
+  drawSprite(ctx, cell, 3, 2, "#7ecfff", "shard");      // 11: shard
+  drawSprite(ctx, cell, 0, 3, "#ffd16a", "hex");        // 12: hex
+  drawSprite(ctx, cell, 1, 3, "#73ff9f", "ring");       // 13: generator ring
+  drawSprite(ctx, cell, 2, 3, "#ffffff", "ui_rect");    // 14: ui_rect
+  drawSprite(ctx, cell, 3, 3, "#ffffff", "soft_circle"); // 15: soft circle (particles)
 
   return {
     texture: canvas,
@@ -41,40 +41,72 @@ export function createAtlas(): AtlasBundle {
   };
 }
 
+type SpriteShape = "tile" | "square" | "boss" | "player" | "edge" | "orb" | "diamond" | "ring" | "star" | "spike" | "shard" | "hex" | "ui_rect" | "soft_circle";
+
+const PROJECTILE_SHAPES: SpriteShape[] = ["orb", "diamond", "spike", "shard", "hex", "star"];
+
 function drawSprite(
   ctx: CanvasRenderingContext2D,
   cell: number,
   col: number,
   row: number,
   color: string,
-  shape: "tile" | "square" | "boss" | "player" | "edge" | "orb" | "diamond" | "ring" | "star" | "spike" | "shard" | "hex" | "ui_rect",
+  shape: SpriteShape,
 ) {
   const x = col * cell;
   const y = row * cell;
   const cx = x + cell / 2;
   const cy = y + cell / 2;
   ctx.fillStyle = color;
+
   if (shape === "tile" || shape === "edge") {
     ctx.fillRect(x, y, cell, cell);
     ctx.strokeStyle = shape === "edge" ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.16)";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(x + 2, y + 2, cell - 4, cell - 4);
+    ctx.lineWidth = 6;
+    ctx.strokeRect(x + 3, y + 3, cell - 6, cell - 6);
     if (shape === "edge") {
       ctx.fillStyle = "rgba(255,255,255,0.14)";
-      ctx.fillRect(x + 8, y + 8, cell - 16, cell - 16);
+      ctx.fillRect(x + 12, y + 12, cell - 24, cell - 24);
     }
     return;
   }
+
   if (shape === "ui_rect") {
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(x + 6, y + 18, cell - 12, cell - 36);
+    ctx.fillRect(x + 8, y + 28, cell - 16, cell - 56);
     return;
   }
+
+  if (shape === "soft_circle") {
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, cell * 0.42);
+    gradient.addColorStop(0, "rgba(255,255,255,1.0)");
+    gradient.addColorStop(0.3, "rgba(255,255,255,0.6)");
+    gradient.addColorStop(0.7, "rgba(255,255,255,0.15)");
+    gradient.addColorStop(1, "rgba(255,255,255,0.0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, cell, cell);
+    return;
+  }
+
   ctx.save();
   ctx.translate(cx, cy);
+
+  // Draw glow halo for projectile shapes
+  if (PROJECTILE_SHAPES.includes(shape)) {
+    const glowGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, cell * 0.38);
+    glowGradient.addColorStop(0, "rgba(255,255,255,0.45)");
+    glowGradient.addColorStop(0.4, "rgba(255,255,255,0.12)");
+    glowGradient.addColorStop(1, "rgba(255,255,255,0.0)");
+    ctx.fillStyle = glowGradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, cell * 0.38, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.fillStyle = "#ffffff";
   ctx.strokeStyle = "rgba(15, 22, 34, 0.85)";
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 5;
+
   if (shape === "square") {
     ctx.fillRect(-cell * 0.22, -cell * 0.22, cell * 0.44, cell * 0.44);
     ctx.strokeRect(-cell * 0.22, -cell * 0.22, cell * 0.44, cell * 0.44);
@@ -146,6 +178,7 @@ function drawSprite(
     ctx.strokeRect(-cell * 0.19, -cell * 0.19, cell * 0.38, cell * 0.38);
     ctx.clearRect(-cell * 0.06, -cell * 0.06, cell * 0.12, cell * 0.12);
   } else {
+    // boss
     ctx.fillRect(-cell * 0.22, -cell * 0.22, cell * 0.44, cell * 0.44);
     ctx.strokeRect(-cell * 0.22, -cell * 0.22, cell * 0.44, cell * 0.44);
     ctx.clearRect(-cell * 0.08, -cell * 0.08, cell * 0.16, cell * 0.16);

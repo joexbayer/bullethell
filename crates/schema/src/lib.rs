@@ -224,6 +224,12 @@ pub enum CommandDef {
         amplitude: f32,
         frames: u16,
     },
+    ClearTilesRect {
+        col: u32,
+        row: u32,
+        width: u32,
+        height: u32,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

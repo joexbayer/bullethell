@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build:content": "RUSTC=\"$(rustup which rustc --toolchain stable-aarch64-apple-darwin)\" rustup run stable cargo run -p content-packer -- assets/content/game.ron public/content.bin",
-    "build:wasm:dev": "RUSTC=\"$(rustup which rustc --toolchain stable-aarch64-apple-darwin)\" rustup run stable cargo build --target wasm32-unknown-unknown -p engine-wasm && wasm-bindgen target/wasm32-unknown-unknown/debug/engine_wasm.wasm --out-dir src/generated --target web --no-typescript",
-    "build:wasm": "RUSTC=\"$(rustup which rustc --toolchain stable-aarch64-apple-darwin)\" rustup run stable cargo build --release --target wasm32-unknown-unknown -p engine-wasm && wasm-bindgen target/wasm32-unknown-unknown/release/engine_wasm.wasm --out-dir src/generated --target web --no-typescript --omit-default-module-path",
+    "build:wasm:dev": "PATH=\"$HOME/.cargo/bin:$PATH\" RUSTC=\"$(rustup which rustc --toolchain stable-aarch64-apple-darwin)\" rustup run stable cargo build --target wasm32-unknown-unknown -p engine-wasm && PATH=\"$HOME/.cargo/bin:$PATH\" wasm-bindgen target/wasm32-unknown-unknown/debug/engine_wasm.wasm --out-dir src/generated --target web --no-typescript",
+    "build:wasm": "PATH=\"$HOME/.cargo/bin:$PATH\" RUSTC=\"$(rustup which rustc --toolchain stable-aarch64-apple-darwin)\" rustup run stable cargo build --release --target wasm32-unknown-unknown -p engine-wasm && PATH=\"$HOME/.cargo/bin:$PATH\" wasm-bindgen target/wasm32-unknown-unknown/release/engine_wasm.wasm --out-dir src/generated --target web --no-typescript --omit-default-module-path",
     "dev": "npm run build:content && npm run build:wasm:dev && vite",
     "build": "npm run build:content && npm run build:wasm && vite build",
     "preview": "vite preview"

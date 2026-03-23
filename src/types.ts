@@ -9,6 +9,7 @@ export interface InputSnapshot {
   slow_mo_pressed: boolean;
   frame_step_pressed: boolean;
   debug_toggle_pressed: boolean;
+  world_rotation_deg: number;
 }
 
 export interface FrameMeta {
@@ -41,6 +42,8 @@ export interface FrameMeta {
   boss_invulnerable: boolean;
   boss_armored: boolean;
   stagger_frames: number;
+  shake_amplitude: number;
+  shake_frames: number;
 }
 
 export interface StatusView {
@@ -58,6 +61,8 @@ export interface RenderViews {
   tile_height: number;
   debug_ptr: number;
   debug_len: number;
+  event_ptr: number;
+  event_len: number;
   floats_per_instance: number;
 }
 

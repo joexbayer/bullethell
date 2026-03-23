@@ -167,8 +167,12 @@ async function boot() {
     }
     const views = get_render_views() as RenderViews;
     const alpha = accumulator / fixedStepMs;
-    const cameraX = lerp(previousMeta?.player_x ?? latestMeta?.player_x ?? 5.5, latestMeta?.player_x ?? 5.5, alpha);
-    const cameraY = lerp(previousMeta?.player_y ?? latestMeta?.player_y ?? 10.5, latestMeta?.player_y ?? 10.5, alpha);
+    let cameraX = lerp(previousMeta?.player_x ?? latestMeta?.player_x ?? 5.5, latestMeta?.player_x ?? 5.5, alpha);
+    let cameraY = lerp(previousMeta?.player_y ?? latestMeta?.player_y ?? 10.5, latestMeta?.player_y ?? 10.5, alpha);
+    if (latestMeta && latestMeta.shake_amplitude > 0) {
+      cameraX += (Math.random() * 2 - 1) * latestMeta.shake_amplitude;
+      cameraY += (Math.random() * 2 - 1) * latestMeta.shake_amplitude;
+    }
     renderer.render(
       views,
       latestMeta,

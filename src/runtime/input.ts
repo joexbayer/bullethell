@@ -82,6 +82,7 @@ export class InputController {
       slow_mo_pressed: this.consume("KeyO"),
       frame_step_pressed: this.consume("BracketRight"),
       debug_toggle_pressed: false,
+      world_rotation_deg: this.worldRotationDeg,
     };
     return snapshot;
   }
