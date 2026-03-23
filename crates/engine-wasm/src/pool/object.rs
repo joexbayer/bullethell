@@ -17,6 +17,8 @@ soa_pool! {
         angle_deg: f32,
         bullet_pattern: Option<usize>,
         color_rgba: [f32; 4],
+        transition_frames: u16,
+        transition_state: u8,
     }
 }
 

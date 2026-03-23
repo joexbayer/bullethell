@@ -59,6 +59,8 @@ pub struct FrameMeta {
     pub boss_invulnerable: bool,
     pub boss_armored: bool,
     pub stagger_frames: u16,
+    pub support_delay_frames: u16,
+    pub damage_window_frames: u16,
     pub shake_amplitude: f32,
     pub shake_frames: u16,
 }

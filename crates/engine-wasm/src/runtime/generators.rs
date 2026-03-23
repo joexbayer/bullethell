@@ -9,6 +9,7 @@ impl Runtime {
         self.boss.generators.sealed[index] = true;
         self.boss.generators.vulnerable[index] = false;
         self.boss.generators.hp[index] = self.boss.generators.max_hp[index];
+        self.refresh_generator_lock_counts();
         let gc = match self.boss.generators.element[index] {
             GeneratorElement::Fire => [1.0_f32, 0.56, 0.20],
             GeneratorElement::Ice => [0.58_f32, 0.88, 1.0],
@@ -48,6 +49,25 @@ impl Runtime {
         }
     }
 
+    pub fn refresh_generator_lock_counts(&mut self) {
+        self.boss.fire_locks = self
+            .boss
+            .generators
+            .element
+            .iter()
+            .zip(self.boss.generators.sealed.iter())
+            .filter(|(element, sealed)| **sealed && **element == GeneratorElement::Fire)
+            .count() as u8;
+        self.boss.ice_locks = self
+            .boss
+            .generators
+            .element
+            .iter()
+            .zip(self.boss.generators.sealed.iter())
+            .filter(|(element, sealed)| **sealed && **element == GeneratorElement::Ice)
+            .count() as u8;
+    }
+
     pub fn select_generator_family(&mut self, rng: &mut Rng64) -> (PatternFamily, bool) {
         if self.boss.generators.len() == 0 {
             return select_family(
@@ -72,22 +92,7 @@ impl Runtime {
                 GeneratorElement::Ice => ice += 1,
             }
         }
-        self.boss.fire_locks = self
-            .boss
-            .generators
-            .element
-            .iter()
-            .zip(self.boss.generators.sealed.iter())
-            .filter(|(element, sealed)| **sealed && **element == GeneratorElement::Fire)
-            .count() as u8;
-        self.boss.ice_locks = self
-            .boss
-            .generators
-            .element
-            .iter()
-            .zip(self.boss.generators.sealed.iter())
-            .filter(|(element, sealed)| **sealed && **element == GeneratorElement::Ice)
-            .count() as u8;
+        self.refresh_generator_lock_counts();
         if fire == ice {
             (PatternFamily::Neutral, false)
         } else if fire > ice {

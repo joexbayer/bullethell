@@ -9,6 +9,7 @@ macro_rules! soa_pool {
             $(pub $field: Vec<$field_type>,)*
         }
 
+        #[derive(Clone)]
         pub struct $SpawnName {
             $(pub $field: $field_type,)*
         }

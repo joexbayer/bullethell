@@ -42,6 +42,8 @@ export interface FrameMeta {
   boss_invulnerable: boolean;
   boss_armored: boolean;
   stagger_frames: number;
+  support_delay_frames: number;
+  damage_window_frames: number;
   shake_amplitude: number;
   shake_frames: number;
 }

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub const CONTENT_VERSION: u32 = 1;
+pub const CONTENT_VERSION: u32 = 2;
 pub const STATUS_SLOW: u32 = 1 << 0;
 pub const STATUS_SICK: u32 = 1 << 1;
 pub const STATUS_SILENCED: u32 = 1 << 2;
@@ -154,6 +154,17 @@ pub struct BulletArchetypeDef {
     pub color_rgba: [f32; 4],
     pub die_on_wall: bool,
     pub armor_piercing: bool,
+    pub detonation: Option<DetonationDef>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DetonationDef {
+    pub after_frames: u16,
+    pub bullet_id: String,
+    pub burst_count: u16,
+    pub spread_deg: f32,
+    pub angle_mode: AngleMode,
+    pub base_angle_deg: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

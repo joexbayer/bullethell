@@ -48,8 +48,10 @@ impl Runtime {
     }
 
     fn resolve_player_shots_vs_targets(&mut self) {
-        let boss_is_damageable = self.boss.stagger_frames > 0
-            || (!self.current_phase().invulnerable
+        let boss_is_damageable = self.boss.damage_window_frames > 0
+            || self.boss.stagger_frames > 0
+            || (self.boss.support_delay_frames == 0
+                && !self.current_phase().invulnerable
                 && !self.boss.invulnerable_override
                 && !(self.current_phase().helper_gates_damage && self.has_phase_blockers()));
         let mut shot_index = 0;
@@ -79,7 +81,8 @@ impl Runtime {
             }
             let mut helper_index = 0;
             while helper_index < self.boss.helpers.len() {
-                if circles_overlap(
+                if self.helper_is_active(helper_index)
+                    && circles_overlap(
                     self.boss.player_shots.pos_x[shot_index],
                     self.boss.player_shots.pos_y[shot_index],
                     self.boss.player_shots.radius[shot_index],
@@ -87,8 +90,16 @@ impl Runtime {
                     self.boss.helpers.pos_y[helper_index],
                     self.boss.helpers.radius[helper_index],
                 ) {
-                    self.boss.helpers.hp[helper_index] -=
-                        self.boss.player_shots.damage[shot_index];
+                    if !self.boss.helpers.invulnerable[helper_index] {
+                        let mut damage = self.boss.player_shots.damage[shot_index];
+                        if self.boss.helpers.armored[helper_index] {
+                            damage *= ARMOR_REDUCTION;
+                        }
+                        if self.boss.helpers.exposed[helper_index] {
+                            damage += EXPOSED_BONUS_DAMAGE;
+                        }
+                        self.boss.helpers.hp[helper_index] -= damage;
+                    }
                     hit = true;
                     break;
                 }
@@ -96,7 +107,8 @@ impl Runtime {
             }
             let mut object_index = 0;
             while !hit && object_index < self.boss.objects.len() {
-                if circles_overlap(
+                if self.object_is_active(object_index)
+                    && circles_overlap(
                     self.boss.player_shots.pos_x[shot_index],
                     self.boss.player_shots.pos_y[shot_index],
                     self.boss.player_shots.radius[shot_index],

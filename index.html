@@ -82,6 +82,76 @@
         padding: 24px;
       }
 
+      .menu-overlay {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: rgba(6, 10, 20, 0.34);
+        backdrop-filter: blur(3px);
+        z-index: 4;
+      }
+
+      .menu-overlay[hidden] {
+        display: none;
+      }
+
+      .menu-card {
+        width: min(420px, calc(100% - 40px));
+        padding: 22px 24px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(6, 10, 20, 0.84);
+        box-shadow: 0 28px 60px rgba(0, 0, 0, 0.45);
+        display: grid;
+        gap: 14px;
+        text-align: center;
+      }
+
+      .menu-kicker {
+        color: var(--muted);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-size: 11px;
+      }
+
+      .menu-title {
+        font-size: 28px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .menu-copy {
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .start-button {
+        justify-self: center;
+        min-width: 164px;
+        padding: 12px 18px;
+        border: 1px solid rgba(255, 196, 112, 0.42);
+        border-radius: 999px;
+        background: linear-gradient(180deg, rgba(255, 163, 72, 0.88), rgba(255, 109, 44, 0.88));
+        color: #fffaf1;
+        font: inherit;
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        cursor: pointer;
+        box-shadow: 0 16px 32px rgba(255, 120, 30, 0.28);
+      }
+
+      .start-button:hover {
+        filter: brightness(1.05);
+      }
+
+      .start-button:active {
+        transform: translateY(1px);
+      }
+
       .boss-hud,
       .player-hud {
         display: grid;
@@ -329,6 +399,10 @@
         text-align: center;
       }
 
+      .timer-pill {
+        min-width: 128px;
+      }
+
       .controls-line {
         flex: 1;
         padding: 9px 14px;
@@ -354,6 +428,14 @@
         <div class="playfield-shell">
           <div class="playfield">
             <canvas id="game" width="960" height="960"></canvas>
+            <div id="menu-overlay" class="menu-overlay">
+              <div class="menu-card">
+                <div id="menu-kicker" class="menu-kicker">Twilight Archmage</div>
+                <div id="menu-title" class="menu-title">Start Run</div>
+                <p id="menu-copy" class="menu-copy">Begin the fight. The timer starts on button press and stops when the boss dies.</p>
+                <button id="start-button" class="start-button" type="button">Start</button>
+              </div>
+            </div>
             <div class="hud-overlay">
               <div id="damage-flash" class="damage-flash"></div>
               <div class="boss-hud">
@@ -391,6 +473,7 @@
             </div>
           </div>
           <div class="underbar">
+            <div id="timer-pill" class="fps-pill timer-pill">00:00.00</div>
             <div id="fps-pill" class="fps-pill">FPS 60</div>
             <div class="controls-line">WASD Move  ·  Mouse Aim  ·  Q / E Rotate  ·  Wheel Zoom  ·  Hold LMB Fire</div>
           </div>

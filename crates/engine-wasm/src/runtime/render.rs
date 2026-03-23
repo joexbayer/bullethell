@@ -262,15 +262,71 @@ impl Runtime {
             let c = self.boss.helpers.color_rgba[index];
             let hp_ratio = (self.boss.helpers.hp[index] / self.boss.helpers.max_hp[index])
                 .clamp(0.0, 1.0);
+            let transition_alpha = match self.boss.helpers.transition_state[index] {
+                ENTITY_STATE_SPAWNING => {
+                    1.0 - self.boss.helpers.transition_frames[index] as f32 / HELPER_SPAWN_FRAMES as f32
+                }
+                ENTITY_STATE_DESPAWNING => {
+                    self.boss.helpers.transition_frames[index] as f32 / HELPER_DESPAWN_FRAMES as f32
+                }
+                _ => 1.0,
+            }
+            .clamp(0.0, 1.0);
+            let transition_scale = match self.boss.helpers.transition_state[index] {
+                ENTITY_STATE_SPAWNING => 1.20 - transition_alpha * 0.20,
+                ENTITY_STATE_DESPAWNING => 0.85 + transition_alpha * 0.15,
+                _ => 1.0,
+            };
+
+            if self.boss.helpers.invulnerable[index] || self.boss.helpers.armored[index] {
+                let pulse = 1.0 + (self.frame as f32 / 8.0).sin() * 0.05;
+                let ring_color = if self.boss.helpers.invulnerable[index] {
+                    [1.0, 0.94, 0.62, 0.88]
+                } else {
+                    [0.74, 0.88, 1.0, 0.82]
+                };
+                push_instance(
+                    &mut self.instances,
+                    hx,
+                    hy,
+                    r * 4.0 * pulse * transition_scale,
+                    r * 4.0 * pulse * transition_scale,
+                    self.frame as f32 * 2.5,
+                    SPRITE_GENERATOR_RING,
+                    [ring_color[0], ring_color[1], ring_color[2], ring_color[3] * transition_alpha],
+                    2.97,
+                    1.0,
+                    0.0,
+                    0.5,
+                    1.0,
+                );
+            }
+            if self.boss.helpers.exposed[index] {
+                push_instance(
+                    &mut self.instances,
+                    hx,
+                    hy,
+                    r * 4.4 * transition_scale,
+                    r * 4.4 * transition_scale,
+                    -(self.frame as f32) * 2.0,
+                    SPRITE_RING,
+                    [1.0, 0.86, 0.34, 0.48 * transition_alpha],
+                    2.975,
+                    1.0,
+                    0.0,
+                    0.35,
+                    1.0,
+                );
+            }
 
             // Enemy: solid background square so it reads as a unit, not a bullet
             push_instance(
                 &mut self.instances,
                 hx, hy,
-                r * 3.6, r * 3.6,
+                r * 3.6 * transition_scale, r * 3.6 * transition_scale,
                 0.0,
                 SPRITE_BOSS,
-                [c[0] * 0.22, c[1] * 0.22, c[2] * 0.22, 0.90],
+                [c[0] * 0.22, c[1] * 0.22, c[2] * 0.22, 0.90 * transition_alpha],
                 2.98,
                 1.0, 0.0,
                 0.0, 0.0,
@@ -279,53 +335,55 @@ impl Runtime {
             push_instance(
                 &mut self.instances,
                 hx, hy,
-                r * 2.8, r * 2.8,
+                r * 2.8 * transition_scale, r * 2.8 * transition_scale,
                 self.boss.helpers.angle_deg[index],
                 self.boss.helpers.sprite[index],
-                c,
+                [c[0], c[1], c[2], c[3] * transition_alpha],
                 3.0,
                 1.0, 0.0,
                 0.0, 0.0,
             );
 
             // HP bar: rotates with camera, always below entity in screen space
-            let bar_width = (r * 2.5).max(0.9);
-            let bar_height = 0.14;
-            let bar_inner = bar_width - 0.06;
-            let theta = self.world_rotation_deg.to_radians();
-            let sin_t = theta.sin();
-            let cos_t = theta.cos();
-            let d = r + 0.32;
-            let bar_x = hx - sin_t * d;
-            let bar_y = hy + cos_t * d;
-            let bar_rot = -self.world_rotation_deg;
-            push_instance(
-                &mut self.instances,
-                bar_x, bar_y,
-                bar_width, bar_height,
-                bar_rot,
-                SPRITE_UI_RECT,
-                [0.08, 0.09, 0.12, 0.96],
-                3.06,
-                1.0, 0.0,
-                0.0, 0.0,
-            );
-            let fill_width = bar_inner * hp_ratio;
-            if fill_width > 0.0 {
-                let shift = (bar_inner - fill_width) * 0.5;
-                let fill_x = bar_x - cos_t * shift;
-                let fill_y = bar_y - sin_t * shift;
+            if self.helper_is_active(index) && !self.boss.helpers.invulnerable[index] {
+                let bar_width = (r * 2.5).max(0.9);
+                let bar_height = 0.14;
+                let bar_inner = bar_width - 0.06;
+                let theta = self.world_rotation_deg.to_radians();
+                let sin_t = theta.sin();
+                let cos_t = theta.cos();
+                let d = r + 0.32;
+                let bar_x = hx - sin_t * d;
+                let bar_y = hy + cos_t * d;
+                let bar_rot = -self.world_rotation_deg;
                 push_instance(
                     &mut self.instances,
-                    fill_x, fill_y,
-                    fill_width, bar_height - 0.04,
+                    bar_x, bar_y,
+                    bar_width, bar_height,
                     bar_rot,
                     SPRITE_UI_RECT,
-                    [0.18, 0.92, 0.40, 1.0],
-                    3.07,
+                    [0.08, 0.09, 0.12, 0.96],
+                    3.06,
                     1.0, 0.0,
                     0.0, 0.0,
                 );
+                let fill_width = bar_inner * hp_ratio;
+                if fill_width > 0.0 {
+                    let shift = (bar_inner - fill_width) * 0.5;
+                    let fill_x = bar_x - cos_t * shift;
+                    let fill_y = bar_y - sin_t * shift;
+                    push_instance(
+                        &mut self.instances,
+                        fill_x, fill_y,
+                        fill_width, bar_height - 0.04,
+                        bar_rot,
+                        SPRITE_UI_RECT,
+                        [0.18, 0.92, 0.40, 1.0],
+                        3.07,
+                        1.0, 0.0,
+                        0.0, 0.0,
+                    );
+                }
             }
         }
     }
@@ -338,15 +396,30 @@ impl Runtime {
             let c = self.boss.objects.color_rgba[index];
             let hp_ratio = (self.boss.objects.hp[index] / self.boss.objects.max_hp[index])
                 .clamp(0.0, 1.0);
+            let transition_alpha = match self.boss.objects.transition_state[index] {
+                ENTITY_STATE_SPAWNING => {
+                    1.0 - self.boss.objects.transition_frames[index] as f32 / OBJECT_SPAWN_FRAMES as f32
+                }
+                ENTITY_STATE_DESPAWNING => {
+                    self.boss.objects.transition_frames[index] as f32 / OBJECT_DESPAWN_FRAMES as f32
+                }
+                _ => 1.0,
+            }
+            .clamp(0.0, 1.0);
+            let transition_scale = match self.boss.objects.transition_state[index] {
+                ENTITY_STATE_SPAWNING => 1.20 - transition_alpha * 0.20,
+                ENTITY_STATE_DESPAWNING => 0.85 + transition_alpha * 0.15,
+                _ => 1.0,
+            };
 
             // Enemy: solid background
             push_instance(
                 &mut self.instances,
                 ox, oy,
-                r * 3.6, r * 3.6,
+                r * 3.6 * transition_scale, r * 3.6 * transition_scale,
                 45.0,
                 SPRITE_BOSS,
-                [c[0] * 0.22, c[1] * 0.22, c[2] * 0.22, 0.90],
+                [c[0] * 0.22, c[1] * 0.22, c[2] * 0.22, 0.90 * transition_alpha],
                 3.28,
                 1.0, 0.0,
                 0.0, 0.0,
@@ -354,10 +427,10 @@ impl Runtime {
             push_instance(
                 &mut self.instances,
                 ox, oy,
-                r * 2.8, r * 2.8,
+                r * 2.8 * transition_scale, r * 2.8 * transition_scale,
                 self.boss.objects.angle_deg[index],
                 self.boss.objects.sprite[index],
-                c,
+                [c[0], c[1], c[2], c[3] * transition_alpha],
                 3.3,
                 1.0, 0.0,
                 0.0, 0.0,

@@ -40,6 +40,13 @@ pub const ARMOR_REDUCTION: f32 = 0.65;
 pub const EXPOSED_BONUS_DAMAGE: f32 = 6.0;
 pub const STAGGER_FRAMES_DEFAULT: u16 = 180;
 pub const REGEN_COMBAT_SCALE: f32 = 0.5;
+pub const HELPER_SPAWN_FRAMES: u16 = 18;
+pub const HELPER_DESPAWN_FRAMES: u16 = 14;
+pub const OBJECT_SPAWN_FRAMES: u16 = 18;
+pub const OBJECT_DESPAWN_FRAMES: u16 = 14;
+pub const ENTITY_STATE_ACTIVE: u8 = 0;
+pub const ENTITY_STATE_SPAWNING: u8 = 1;
+pub const ENTITY_STATE_DESPAWNING: u8 = 2;
 
 // --- Events (type, x, y, r, g, b, extra) ---
 pub const EVENT_FLOATS: usize = 7;
