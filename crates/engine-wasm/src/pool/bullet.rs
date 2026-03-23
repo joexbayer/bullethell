@@ -19,6 +19,7 @@ soa_pool! {
         color_rgba: [f32; 4],
         flags: u32,
         delay_frames: u16,
+        detonate_frames: u16,
         damage: f32,
         render_layer: RenderLayer,
     }

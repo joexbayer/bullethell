@@ -20,6 +20,7 @@ pub mod collision;
 pub mod emitter;
 pub mod generators;
 pub mod helpers;
+pub mod archmage;
 pub mod player;
 pub mod render;
 pub mod status;
@@ -124,14 +125,21 @@ impl Runtime {
                 neutral_index: 0,
                 active_pattern: None,
                 stagger_frames: 0,
+                support_delay_frames: 0,
+                damage_window_frames: 0,
                 invulnerable_override: false,
                 armored_override: false,
                 fire_locks: 0,
                 ice_locks: 0,
+                last_pattern_family: schema::PatternFamily::Neutral,
+                last_pattern_nuke: false,
+                duel_majority: schema::PatternFamily::Neutral,
+                duel_stage: 0,
                 helper_gates_damage: false,
                 generators: GeneratorPool::new(),
                 helpers: HelperPool::new(),
                 objects: EncounterObjectPool::new(),
+                pending_helper_respawns: Vec::new(),
                 enemy_bullets: BulletPool::with_capacity(8192),
                 player_shots: BulletPool::with_capacity(512),
             },
@@ -220,8 +228,21 @@ impl Runtime {
                 .unwrap_or_else(|| "idle".to_string()),
             active_enemy_bullets: self.boss.enemy_bullets.len(),
             active_player_shots: self.boss.player_shots.len(),
-            active_helpers: self.boss.helpers.len(),
-            active_objects: self.boss.objects.len(),
+            active_helpers: self
+                .boss
+                .helpers
+                .transition_state
+                .iter()
+                .zip(self.boss.helpers.invulnerable.iter())
+                .filter(|(state, invulnerable)| **state == ENTITY_STATE_ACTIVE && !**invulnerable)
+                .count(),
+            active_objects: self
+                .boss
+                .objects
+                .transition_state
+                .iter()
+                .filter(|state| **state == ENTITY_STATE_ACTIVE)
+                .count(),
             active_generators: self.boss.generators.len(),
             player_x: self.player.pos_x,
             player_y: self.player.pos_y,
@@ -240,6 +261,8 @@ impl Runtime {
             boss_invulnerable: self.boss_is_invulnerable(),
             boss_armored: self.boss_is_armored(),
             stagger_frames: self.boss.stagger_frames,
+            support_delay_frames: self.boss.support_delay_frames,
+            damage_window_frames: self.boss.damage_window_frames,
             shake_amplitude: self.shake_amplitude,
             shake_frames: self.shake_frames,
         }
@@ -255,7 +278,16 @@ impl Runtime {
 
     fn phase_tick(&mut self) {
         self.boss.phase_timer += 1;
-        if self.boss.stagger_frames > 0 {
+        if self.boss.support_delay_frames > 0 {
+            self.boss.support_delay_frames -= 1;
+            if self.boss.support_delay_frames == 0 {
+                self.begin_support_damage_window();
+            }
+        }
+        if self.boss.damage_window_frames > 0 {
+            self.boss.damage_window_frames -= 1;
+            self.boss.stagger_frames = self.boss.damage_window_frames;
+        } else if self.boss.stagger_frames > 0 {
             self.boss.stagger_frames -= 1;
         }
         if self.shake_frames > 0 {

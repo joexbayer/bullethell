@@ -28,14 +28,21 @@ pub struct BossRuntime {
     pub neutral_index: usize,
     pub active_pattern: Option<ActivePattern>,
     pub stagger_frames: u16,
+    pub support_delay_frames: u16,
+    pub damage_window_frames: u16,
     pub invulnerable_override: bool,
     pub armored_override: bool,
     pub fire_locks: u8,
     pub ice_locks: u8,
+    pub last_pattern_family: PatternFamily,
+    pub last_pattern_nuke: bool,
+    pub duel_majority: PatternFamily,
+    pub duel_stage: u8,
     pub helper_gates_damage: bool,
     pub generators: GeneratorPool,
     pub helpers: HelperPool,
     pub objects: EncounterObjectPool,
+    pub pending_helper_respawns: Vec<HelperSpawn>,
     pub enemy_bullets: BulletPool,
     pub player_shots: BulletPool,
 }
@@ -49,7 +56,7 @@ pub struct ActivePattern {
 
 impl Runtime {
     pub fn update_pattern(&mut self, rng: &mut Rng64) {
-        if self.boss.stagger_frames > 0 {
+        if self.boss.support_delay_frames > 0 || self.boss.stagger_frames > 0 {
             return;
         }
         if self.boss.active_pattern.is_none() {
@@ -60,6 +67,7 @@ impl Runtime {
                 damage_taken: 0.0,
             });
             self.boss.phase_pattern_counter += 1;
+            self.archmage_on_pattern_selected();
         }
         let Some(mut active) = self.boss.active_pattern.take() else {
             return;
@@ -107,8 +115,35 @@ impl Runtime {
     }
 
     pub fn select_pattern_index(&mut self, rng: &mut Rng64) -> usize {
+        if self.encounter_id == "twilight_archmage_v1" {
+            match self.current_phase().id.as_str() {
+                "duel" => {
+                    let pattern_id = match self.boss.duel_majority {
+                        PatternFamily::Fire => "fire_axis_sweep",
+                        PatternFamily::Ice => "ice_spinner_trap",
+                        PatternFamily::Neutral => "fire_axis_sweep",
+                    };
+                    self.boss.last_pattern_family = self.boss.duel_majority;
+                    self.boss.last_pattern_nuke = true;
+                    return self.pattern_lookup[pattern_id];
+                }
+                "finale" => {
+                    let pattern_id = match self.archmage_locked_majority() {
+                        PatternFamily::Fire => "finale_fire",
+                        PatternFamily::Ice => "finale_ice",
+                        PatternFamily::Neutral => "finale_fire",
+                    };
+                    self.boss.last_pattern_family = self.archmage_locked_majority();
+                    self.boss.last_pattern_nuke = true;
+                    return self.pattern_lookup[pattern_id];
+                }
+                _ => {}
+            }
+        }
         let selector = self.current_phase().selector.clone();
         let (family, nuke) = self.select_generator_family(rng);
+        self.boss.last_pattern_family = family;
+        self.boss.last_pattern_nuke = nuke;
         let patterns = match (family, nuke) {
             (PatternFamily::Fire, false) if !selector.fire_patterns.is_empty() => {
                 let index = self.boss.fire_pattern_index % selector.fire_patterns.len();
@@ -174,13 +209,18 @@ impl Runtime {
                     angle_deg: 0.0,
                     bullet_pattern,
                     color_rgba,
+                    invulnerable: false,
+                    armored: false,
+                    exposed: false,
+                    transition_frames: HELPER_SPAWN_FRAMES,
+                    transition_state: ENTITY_STATE_SPAWNING,
                 };
-                self.boss.helpers.push(spawn);
+                self.upsert_helper(spawn, false);
             }
             CommandDef::DespawnHelper { helper_id } => {
-                self.boss.helpers.remove_id(&helper_id);
+                self.despawn_helper_id(&helper_id);
             }
-            CommandDef::DespawnHelpers => self.boss.helpers.clear(),
+            CommandDef::DespawnHelpers => self.despawn_all_helpers(),
             CommandDef::SpawnObject {
                 object_id,
                 sprite,
@@ -212,11 +252,32 @@ impl Runtime {
                     angle_deg: 0.0,
                     bullet_pattern,
                     color_rgba,
+                    transition_frames: OBJECT_SPAWN_FRAMES,
+                    transition_state: ENTITY_STATE_SPAWNING,
                 };
-                self.boss.objects.push(spawn);
+                if let Some(index) = self.boss.objects.find_index(&spawn.ids) {
+                    self.boss.objects.sprite[index] = spawn.sprite;
+                    self.boss.objects.pos_x[index] = spawn.pos_x;
+                    self.boss.objects.pos_y[index] = spawn.pos_y;
+                    self.boss.objects.hp[index] = spawn.hp;
+                    self.boss.objects.max_hp[index] = spawn.max_hp;
+                    self.boss.objects.radius[index] = spawn.radius;
+                    self.boss.objects.motion[index] = spawn.motion;
+                    self.boss.objects.anchor_x[index] = spawn.anchor_x;
+                    self.boss.objects.anchor_y[index] = spawn.anchor_y;
+                    self.boss.objects.orbit_radius[index] = spawn.orbit_radius;
+                    self.boss.objects.orbit_speed_deg[index] = spawn.orbit_speed_deg;
+                    self.boss.objects.angle_deg[index] = spawn.angle_deg;
+                    self.boss.objects.bullet_pattern[index] = spawn.bullet_pattern;
+                    self.boss.objects.color_rgba[index] = spawn.color_rgba;
+                    self.boss.objects.transition_frames[index] = OBJECT_SPAWN_FRAMES;
+                    self.boss.objects.transition_state[index] = ENTITY_STATE_SPAWNING;
+                } else {
+                    self.boss.objects.push(spawn);
+                }
             }
             CommandDef::DespawnObject { object_id } => {
-                self.boss.objects.remove_id(&object_id);
+                self.despawn_object_id(&object_id);
             }
             CommandDef::SetGeneratorsVulnerable(value) => {
                 for index in 0..self.boss.generators.len() {
@@ -236,7 +297,7 @@ impl Runtime {
                     self.boss.generators.element[index] = element;
                 }
             }
-            CommandDef::DespawnObjects => self.boss.objects.clear(),
+            CommandDef::DespawnObjects => self.despawn_all_objects(),
             CommandDef::SetBossInvulnerable(value) => self.boss.invulnerable_override = value,
             CommandDef::SetBossArmored(value) => self.boss.armored_override = value,
             CommandDef::SetElementLocks {
@@ -284,10 +345,15 @@ impl Runtime {
         self.boss.invulnerable_override = self.current_phase().invulnerable;
         self.boss.armored_override = self.current_phase().armored;
         self.boss.helper_gates_damage = self.current_phase().helper_gates_damage;
+        self.boss.support_delay_frames = 0;
+        self.boss.damage_window_frames = 0;
+        self.boss.stagger_frames = 0;
+        self.boss.pending_helper_respawns.clear();
         let commands = self.current_phase().enter_commands.clone();
         for command in commands {
             self.execute_command(command);
         }
+        self.archmage_on_phase_enter();
     }
 
     pub fn apply_transitions(&mut self) {
@@ -298,6 +364,10 @@ impl Runtime {
             ]);
             self.current_message = "Boss defeated".to_string();
             self.boss.active_pattern = None;
+            self.boss.support_delay_frames = 0;
+            self.boss.damage_window_frames = 0;
+            self.boss.stagger_frames = 0;
+            self.boss.pending_helper_respawns.clear();
             self.boss.enemy_bullets = BulletPool::new();
             self.boss.helpers.clear();
             self.boss.objects.clear();
@@ -339,6 +409,17 @@ impl Runtime {
     }
 
     pub fn has_phase_blockers(&self) -> bool {
-        self.boss.helpers.len() > 0 || self.boss.objects.len() > 0
+        self.boss
+            .helpers
+            .transition_state
+            .iter()
+            .zip(self.boss.helpers.invulnerable.iter())
+            .any(|(state, invulnerable)| *state == ENTITY_STATE_ACTIVE && !*invulnerable)
+            || self
+                .boss
+                .objects
+                .transition_state
+                .iter()
+                .any(|state| *state == ENTITY_STATE_ACTIVE)
     }
 }

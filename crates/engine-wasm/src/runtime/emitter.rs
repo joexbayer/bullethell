@@ -121,6 +121,11 @@ impl Runtime {
                 color_rgba,
                 flags,
                 delay_frames: archetype.delay_frames,
+                detonate_frames: archetype
+                    .detonation
+                    .as_ref()
+                    .map(|detonation| detonation.after_frames)
+                    .unwrap_or(0),
                 damage: archetype.damage,
                 render_layer: archetype.render_layer,
             });

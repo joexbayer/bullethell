@@ -81,6 +81,7 @@ impl Runtime {
                     color_rgba: [0.95, 0.95, 1.0, 1.0],
                     flags: BULLET_FLAG_IS_PLAYER_SHOT,
                     delay_frames: 0,
+                    detonate_frames: 0,
                     damage: PLAYER_SHOT_DAMAGE,
                     render_layer: PLAYER_SHOT_LAYER,
                 });

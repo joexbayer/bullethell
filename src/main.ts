@@ -16,7 +16,7 @@ import { InputController } from "./runtime/input";
 import { BOSS_DISPLAY_NAME, CANVAS_RESOLUTION } from "./config";
 
 const ENCOUNTER_ID = "twilight_archmage_v1";
-const RESTART_DELAY_MS = 900;
+type RunState = "ready" | "running" | "victory";
 
 async function boot() {
   const canvas = document.querySelector<HTMLCanvasElement>("#game");
@@ -26,12 +26,17 @@ async function boot() {
   const bossBarFill = document.querySelector<HTMLDivElement>("#boss-bar-fill");
   const objectiveLabel = document.querySelector<HTMLSpanElement>("#objective-label");
   const fpsPill = document.querySelector<HTMLDivElement>("#fps-pill");
+  const timerPill = document.querySelector<HTMLDivElement>("#timer-pill");
   const promptFlash = document.querySelector<HTMLDivElement>("#prompt-flash");
   const damageFlash = document.querySelector<HTMLDivElement>("#damage-flash");
   const playerHpLabel = document.querySelector<HTMLSpanElement>("#player-hp-label");
   const playerBarFill = document.querySelector<HTMLDivElement>("#player-bar-fill");
   const playerMpLabel = document.querySelector<HTMLSpanElement>("#player-mp-label");
   const playerManaFill = document.querySelector<HTMLDivElement>("#player-mana-fill");
+  const menuOverlay = document.querySelector<HTMLDivElement>("#menu-overlay");
+  const menuTitle = document.querySelector<HTMLDivElement>("#menu-title");
+  const menuCopy = document.querySelector<HTMLParagraphElement>("#menu-copy");
+  const startButton = document.querySelector<HTMLButtonElement>("#start-button");
   if (
     !canvas ||
     !bossName ||
@@ -40,12 +45,17 @@ async function boot() {
     !bossBarFill ||
     !objectiveLabel ||
     !fpsPill ||
+    !timerPill ||
     !promptFlash ||
     !damageFlash ||
     !playerHpLabel ||
     !playerBarFill ||
     !playerMpLabel ||
-    !playerManaFill
+    !playerManaFill ||
+    !menuOverlay ||
+    !menuTitle ||
+    !menuCopy ||
+    !startButton
   ) {
     throw new Error("missing DOM nodes");
   }
@@ -77,11 +87,74 @@ async function boot() {
   let lastDamageFlashAt = -10_000;
   let lastHudUpdate = -1_000;
   let hudCache = "";
-  let restartAt = -1;
+  let runState: RunState = "ready";
+  let runStartAt = 0;
+  let runElapsedMs = 0;
+
+  const syncMenu = () => {
+    timerPill.textContent = formatRunTime(runElapsedMs);
+    menuOverlay.hidden = runState === "running";
+    if (runState === "ready") {
+      objectiveLabel.textContent = "Press Start";
+      objectiveLabel.dataset.tone = "seal";
+      bossState.textContent = "Waiting";
+      menuTitle.textContent = runElapsedMs > 0 ? "Run Failed" : "Start Run";
+      menuCopy.textContent =
+        runElapsedMs > 0
+          ? `You died. Last run: ${formatRunTime(runElapsedMs)}. Press Start to try again.`
+          : "Begin the fight. The timer starts on button press and stops when the boss dies.";
+      startButton.textContent = "Start";
+    } else if (runState === "victory") {
+      objectiveLabel.textContent = "Boss Down";
+      objectiveLabel.dataset.tone = "victory";
+      bossState.textContent = "Defeated";
+      menuTitle.textContent = "Boss Down";
+      menuCopy.textContent = `Clear time: ${formatRunTime(runElapsedMs)}.`;
+      startButton.textContent = "Start Again";
+      menuOverlay.hidden = true;
+    }
+  };
+
+  const resetHudCache = () => {
+    hudCache = "";
+    lastHudUpdate = -1_000;
+  };
+
+  const beginRun = (now: number) => {
+    load_encounter(ENCOUNTER_ID);
+    latestMeta = null;
+    previousMeta = null;
+    accumulator = 0;
+    runState = "running";
+    runStartAt = now;
+    runElapsedMs = 0;
+    lastPrompt = "";
+    lastPromptAt = -30_000;
+    resetHudCache();
+    syncMenu();
+  };
+
+  const failRun = () => {
+    runState = "ready";
+    load_encounter(ENCOUNTER_ID);
+    latestMeta = null;
+    previousMeta = null;
+    accumulator = 0;
+    lastPrompt = "You Died";
+    lastPromptAt = performance.now();
+    promptFlash.textContent = "You Died";
+    replayAnimation(promptFlash);
+    resetHudCache();
+    syncMenu();
+  };
+
+  startButton.addEventListener("click", () => beginRun(performance.now()));
+  syncMenu();
 
   const updateHud = (meta: FrameMeta, now: number) => {
-    if (restartAt > 0 && now < restartAt) {
-      objectiveLabel.textContent = "Restarting";
+    timerPill.textContent = formatRunTime(runElapsedMs);
+    if (runState !== "running") {
+      objectiveLabel.textContent = runState === "victory" ? "Boss Down" : "Press Start";
       objectiveLabel.dataset.tone = "seal";
       return;
     }
@@ -105,9 +178,17 @@ async function boot() {
         hudCache = nextCache;
         bossHpLabel.textContent = `${Math.ceil(meta.boss_hp)} / ${Math.ceil(meta.boss_max_hp)}`;
         bossBarFill.style.transform = `scaleX(${safeRatio(meta.boss_hp, meta.boss_max_hp)})`;
-        bossState.textContent = meta.boss_invulnerable ? "Invulnerable" : meta.boss_armored ? "Armored" : "Vulnerable";
-        bossState.classList.toggle("invulnerable", meta.boss_invulnerable);
-        bossState.classList.toggle("armored", !meta.boss_invulnerable && meta.boss_armored);
+        const bossStateLabel =
+          meta.support_delay_frames > 0
+            ? "Recovering"
+            : meta.boss_invulnerable
+              ? "Invulnerable"
+              : meta.boss_armored
+                ? "Armored"
+                : "Vulnerable";
+        bossState.textContent = bossStateLabel;
+        bossState.classList.toggle("invulnerable", meta.support_delay_frames > 0 || meta.boss_invulnerable);
+        bossState.classList.toggle("armored", meta.support_delay_frames === 0 && !meta.boss_invulnerable && meta.boss_armored);
         objectiveLabel.textContent = objective.label;
         objectiveLabel.dataset.tone = objective.tone;
         fpsPill.textContent = `FPS ${Math.round(meta.fps_estimate)}`;
@@ -115,6 +196,7 @@ async function boot() {
         playerBarFill.style.transform = `scaleX(${safeRatio(meta.player_hp, meta.player_max_hp)})`;
         playerMpLabel.textContent = `${Math.ceil(meta.player_mp)} / ${Math.ceil(meta.player_max_mp)}`;
         playerManaFill.style.transform = `scaleX(${safeRatio(meta.player_mp, meta.player_max_mp)})`;
+        timerPill.textContent = formatRunTime(runElapsedMs);
       }
     }
     const flashText = getFlashPrompt(meta);
@@ -130,17 +212,8 @@ async function boot() {
     const delta = Math.min(32, now - previous);
     previous = now;
     input.advance(delta);
-    if (restartAt > 0) {
-      if (now >= restartAt) {
-        load_encounter(ENCOUNTER_ID);
-        restartAt = -1;
-        latestMeta = null;
-        previousMeta = null;
-        accumulator = 0;
-        hudCache = "";
-        lastHudUpdate = -1_000;
-      }
-    } else {
+    if (runState === "running") {
+      runElapsedMs = now - runStartAt;
       accumulator += delta;
       while (accumulator >= fixedStepMs) {
         previousMeta = latestMeta;
@@ -151,13 +224,13 @@ async function boot() {
           replayAnimation(damageFlash);
         }
         if (previousMeta && previousMeta.player_hp > 0.0 && latestMeta.player_hp <= 0.0) {
-          restartAt = now + RESTART_DELAY_MS;
-          lastPrompt = "You Died";
-          lastPromptAt = now;
-          promptFlash.textContent = "You Died";
-          replayAnimation(promptFlash);
-          objectiveLabel.textContent = "Restarting";
-          objectiveLabel.dataset.tone = "seal";
+          failRun();
+          break;
+        }
+        if (previousMeta && previousMeta.boss_hp > 0.0 && latestMeta.boss_hp <= 0.0) {
+          runState = "victory";
+          runElapsedMs = now - runStartAt;
+          syncMenu();
           break;
         }
         accumulator -= fixedStepMs;
@@ -222,28 +295,68 @@ function getObjective(meta: FrameMeta): { label: string; tone: string } {
   if (meta.phase.startsWith("seal_")) {
     return { label: "Kill Seal", tone: "seal" };
   }
+  if (meta.phase === "duel") {
+    return {
+      label: meta.active_helpers > 1 ? "Kill Birds" : "Kill Bird",
+      tone: "bird",
+    };
+  }
+  if (meta.damage_window_frames > 0 || meta.stagger_frames > 0) {
+    return { label: "Attack Boss", tone: "attack" };
+  }
+  if (meta.support_delay_frames > 0) {
+    return { label: "Clear Bullets", tone: "seal" };
+  }
+  if (meta.phase === "single_bird") {
+    return { label: "Kill Bird", tone: "bird" };
+  }
+  if (meta.phase === "dual_guard") {
+    return { label: "Kill Birds", tone: "bird" };
+  }
   if (meta.active_objects > 0) {
     return { label: "Kill Portals", tone: "portal" };
   }
   if (meta.active_helpers > 0) {
-    return { label: "Kill Birds", tone: "bird" };
+    return { label: meta.active_helpers > 1 ? "Kill Birds" : "Kill Bird", tone: "bird" };
   }
   return { label: "Attack Boss", tone: "attack" };
 }
 
 function getFlashPrompt(meta: FrameMeta): string {
+  if (meta.message && shouldFlashMessage(meta.message)) {
+    return meta.message;
+  }
   const objective = getObjective(meta).label;
   if (objective === "Boss Down") {
     return objective;
   }
-  if (objective === "Attack Boss" && meta.stagger_frames === 0) {
+  if (
+    objective === "Attack Boss" &&
+    meta.stagger_frames === 0 &&
+    meta.damage_window_frames === 0
+  ) {
     return "";
   }
   return objective;
 }
 
+function shouldFlashMessage(message: string): boolean {
+  return (
+    message.startsWith("Phase:") ||
+    message.startsWith("Generator sealed:") ||
+    message === "Twilight Archmage awakens" ||
+    message === "Seal a Magi-Generator" ||
+    message === "Seal another Magi-Generator" ||
+    message === "Final generator exposed" ||
+    message === "Generator-lock duel" ||
+    message === "Finale" ||
+    message === "Archmage staggered" ||
+    message === "Bird down: clear bullets"
+  );
+}
+
 function shouldFlashPrompt(next: string, now: number, last: string, lastAt: number): boolean {
-  return now - lastAt >= 30_000 && next !== last;
+  return next !== last && now - lastAt >= 600;
 }
 
 function replayAnimation(element: HTMLElement): void {
@@ -260,3 +373,11 @@ boot().catch((error) => {
     objectiveLabel.dataset.tone = "seal";
   }
 });
+
+function formatRunTime(totalMs: number): string {
+  const bounded = Math.max(0, totalMs);
+  const minutes = Math.floor(bounded / 60000);
+  const seconds = Math.floor((bounded % 60000) / 1000);
+  const centiseconds = Math.floor((bounded % 1000) / 10);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(centiseconds).padStart(2, "0")}`;
+}

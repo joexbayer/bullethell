@@ -268,6 +268,7 @@ mod tests {
                 color_rgba: [1.0, 0.2, 0.2, 1.0],
                 die_on_wall: true,
                 armor_piercing: false,
+                detonation: None,
             }],
             patterns: vec![PatternDef {
                 id: "pattern".to_string(),
