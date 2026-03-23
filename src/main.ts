@@ -8,6 +8,7 @@ import init, {
   start_replay,
   step,
 } from "./generated/engine_wasm.js";
+import wasmUrl from "./generated/engine_wasm_bg.wasm?url";
 import type { FrameMeta, RenderViews } from "./types";
 import { createAtlas } from "./renderer/atlas";
 import { Renderer } from "./renderer/renderer";
@@ -52,8 +53,8 @@ async function boot() {
   canvas.height = CANVAS_RESOLUTION;
   bossName.textContent = BOSS_DISPLAY_NAME;
 
-  const wasm = await init();
-  const [contentResponse] = await Promise.all([fetch("/content.bin")]);
+  const wasm = await init(wasmUrl);
+  const [contentResponse] = await Promise.all([fetch(import.meta.env.BASE_URL + "content.bin")]);
   const contentBlob = new Uint8Array(await contentResponse.arrayBuffer());
   const atlas = createAtlas();
   const renderer = new Renderer(canvas, atlas, wasm.memory as WebAssembly.Memory);
