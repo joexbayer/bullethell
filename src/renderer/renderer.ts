@@ -264,7 +264,9 @@ void main() {
   float row = floor(iSprite / uAtlasGrid.x);
   vec2 spriteMin = vec2(col, row) / uAtlasGrid;
   vec2 spriteSize = vec2(1.0) / uAtlasGrid;
-  vUv = spriteMin + aQuadUv * spriteSize;
+  // Inset UVs by half a texel to prevent bleeding between atlas cells
+  vec2 halfTexel = vec2(0.5 / 512.0);
+  vUv = spriteMin + halfTexel + aQuadUv * (spriteSize - 2.0 * halfTexel);
   vLocalUv = aQuadUv;
   vColor = iColor;
   vGlow = iGlow;

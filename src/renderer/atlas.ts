@@ -114,11 +114,9 @@ function drawSprite(
     ctx.beginPath();
     ctx.arc(0, 0, cell * 0.20, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
   } else if (shape === "diamond") {
     ctx.rotate(Math.PI / 4);
     ctx.fillRect(-cell * 0.18, -cell * 0.18, cell * 0.36, cell * 0.36);
-    ctx.strokeRect(-cell * 0.18, -cell * 0.18, cell * 0.36, cell * 0.36);
   } else if (shape === "ring") {
     ctx.beginPath();
     ctx.arc(0, 0, cell * 0.21, 0, Math.PI * 2);
@@ -128,9 +126,6 @@ function drawSprite(
     ctx.arc(0, 0, cell * 0.11, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalCompositeOperation = "source-over";
-    ctx.beginPath();
-    ctx.arc(0, 0, cell * 0.21, 0, Math.PI * 2);
-    ctx.stroke();
   } else if (shape === "spike") {
     ctx.beginPath();
     ctx.moveTo(cell * 0.26, 0);
@@ -138,7 +133,6 @@ function drawSprite(
     ctx.lineTo(-cell * 0.16, cell * 0.16);
     ctx.closePath();
     ctx.fill();
-    ctx.stroke();
   } else if (shape === "shard") {
     ctx.beginPath();
     ctx.moveTo(cell * 0.22, 0);
@@ -147,7 +141,6 @@ function drawSprite(
     ctx.lineTo(0, cell * 0.18);
     ctx.closePath();
     ctx.fill();
-    ctx.stroke();
   } else if (shape === "hex") {
     ctx.beginPath();
     for (let i = 0; i < 6; i += 1) {
@@ -159,7 +152,6 @@ function drawSprite(
     }
     ctx.closePath();
     ctx.fill();
-    ctx.stroke();
   } else if (shape === "star") {
     ctx.beginPath();
     for (let i = 0; i < 10; i += 1) {
@@ -172,7 +164,6 @@ function drawSprite(
     }
     ctx.closePath();
     ctx.fill();
-    ctx.stroke();
   } else if (shape === "player") {
     ctx.fillRect(-cell * 0.19, -cell * 0.19, cell * 0.38, cell * 0.38);
     ctx.strokeRect(-cell * 0.19, -cell * 0.19, cell * 0.38, cell * 0.38);
