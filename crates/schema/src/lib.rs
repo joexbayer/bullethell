@@ -82,6 +82,7 @@ pub enum EmitterSource {
     ArenaBottom,
     ArenaLeft,
     ArenaRight,
+    ArenaRandom,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

@@ -8,6 +8,20 @@ use crate::runtime::Runtime;
 
 impl Runtime {
     pub fn fire_emitter(&mut self, emitter: &EmitterDef, frame: u16, rng: &mut Rng64) {
+        if emitter.source == EmitterSource::ArenaRandom {
+            // Each bullet in the burst lands at its own independent random position.
+            let half_range = 7.0_f32;
+            let burst_count = emitter.burst_count.max(1);
+            let single = EmitterDef { burst_count: 1, ..emitter.clone() };
+            for _ in 0..burst_count {
+                let rx = (rng.next_f32() * 2.0 - 1.0) * half_range;
+                let ry = (rng.next_f32() * 2.0 - 1.0) * half_range;
+                let ox = self.boss.pos_x + rx;
+                let oy = self.boss.pos_y + ry;
+                self.spawn_emitter_burst(ox, oy, &single, frame, rng);
+            }
+            return;
+        }
         let origin = match emitter.source {
             EmitterSource::Boss => (self.boss.pos_x, self.boss.pos_y),
             EmitterSource::ArenaTop => {
@@ -22,7 +36,7 @@ impl Runtime {
             EmitterSource::ArenaRight => {
                 (self.boss.pos_x + ARENA_EDGE_EMITTER_RADIUS, self.boss.pos_y)
             }
-            EmitterSource::Helper | EmitterSource::Object => return,
+            EmitterSource::Helper | EmitterSource::Object | EmitterSource::ArenaRandom => return,
         };
         self.spawn_emitter_burst(origin.0, origin.1, emitter, frame, rng);
     }
