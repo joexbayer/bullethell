@@ -96,6 +96,7 @@ pub enum DebugCommand {
     Step,
     ToggleHitboxes,
     SeekReplayFrame(u32),
+    JumpPhase(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

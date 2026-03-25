@@ -163,6 +163,11 @@ pub fn debug_command(cmd: JsValue) -> Result<(), JsValue> {
                     game.replay.playback_cursor = frame as usize;
                 }
             }
+            DebugCommand::JumpPhase(target) => {
+                let encounter_id = game.runtime.encounter_id.clone();
+                game.runtime = Runtime::new(&game.content, encounter_id)?;
+                game.runtime.debug_jump_phase(&target)?;
+            }
         }
         Ok(())
     })

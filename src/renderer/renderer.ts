@@ -1,4 +1,4 @@
-import type { FrameMeta, RenderViews } from "../types";
+import type { AtlasMeta, FrameMeta, RenderViews } from "../types";
 import { VIEW_WORLD_SIZE } from "../config";
 import type { AtlasBundle } from "./atlas";
 import { createProgram } from "./shader";
@@ -15,6 +15,7 @@ export class Renderer {
   private readonly quadBuffer: WebGLBuffer;
   private readonly instanceBuffer: WebGLBuffer;
   private readonly texture: WebGLTexture;
+  private readonly atlasMeta: AtlasMeta;
   private readonly mainUniforms: {
     viewSize: WebGLUniformLocation | null;
     cameraCenter: WebGLUniformLocation | null;
@@ -49,6 +50,7 @@ export class Renderer {
     this.quadBuffer = quadBuffer;
     this.instanceBuffer = instanceBuffer;
     this.texture = texture;
+    this.atlasMeta = atlas.meta;
     this.mainUniforms = {
       viewSize: gl.getUniformLocation(this.program, "uViewSize"),
       cameraCenter: gl.getUniformLocation(this.program, "uCameraCenter"),
@@ -118,7 +120,7 @@ export class Renderer {
     gl.uniform2f(this.mainUniforms.viewSize, viewWorldSize, viewWorldSize);
     gl.uniform2f(this.mainUniforms.cameraCenter, cameraX, cameraY);
     gl.uniform1f(this.mainUniforms.worldRotationDeg, worldRotationDeg);
-    gl.uniform2f(this.mainUniforms.atlasGrid, 4, 4);
+    gl.uniform2f(this.mainUniforms.atlasGrid, this.atlasMeta.cols, this.atlasMeta.rows);
     gl.uniform1f(this.mainUniforms.time, this.frameCount / 60.0);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);

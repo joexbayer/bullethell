@@ -11,16 +11,16 @@ impl Runtime {
         let origin = match emitter.source {
             EmitterSource::Boss => (self.boss.pos_x, self.boss.pos_y),
             EmitterSource::ArenaTop => {
-                (self.player.pos_x, self.arena.arena.camera_bounds.min_y + 1.0)
+                (self.boss.pos_x, self.boss.pos_y - ARENA_EDGE_EMITTER_RADIUS)
             }
             EmitterSource::ArenaBottom => {
-                (self.player.pos_x, self.arena.arena.camera_bounds.max_y - 1.0)
+                (self.boss.pos_x, self.boss.pos_y + ARENA_EDGE_EMITTER_RADIUS)
             }
             EmitterSource::ArenaLeft => {
-                (self.arena.arena.camera_bounds.min_x + 1.0, self.player.pos_y)
+                (self.boss.pos_x - ARENA_EDGE_EMITTER_RADIUS, self.boss.pos_y)
             }
             EmitterSource::ArenaRight => {
-                (self.arena.arena.camera_bounds.max_x - 1.0, self.player.pos_y)
+                (self.boss.pos_x + ARENA_EDGE_EMITTER_RADIUS, self.boss.pos_y)
             }
             EmitterSource::Helper | EmitterSource::Object => return,
         };

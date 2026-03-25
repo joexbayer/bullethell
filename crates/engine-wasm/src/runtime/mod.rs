@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use schema::{
     ArenaDef, BulletArchetypeDef, CompiledContent, EncounterDef, GeneratorElement, PatternDef,
-    PhaseDef,
+    PatternFamily, PhaseDef,
 };
 use wasm_bindgen::prelude::*;
 
@@ -309,5 +309,136 @@ impl Runtime {
                 .wrapping_add((self.boss.enemy_bullets.pos_y[index].to_bits() as u64) << 1);
         }
         value
+    }
+
+    pub fn debug_jump_phase(&mut self, target: &str) -> Result<(), JsValue> {
+        if self.encounter_id == "twilight_archmage_v1" {
+            self.debug_jump_archmage_phase(target)?;
+        } else {
+            let phase_index = self
+                .phase_lookup
+                .get(target)
+                .copied()
+                .ok_or_else(|| JsValue::from_str("unknown phase"))?;
+            self.boss.phase_index = phase_index;
+            self.boss.phase_pattern_counter = 0;
+            self.boss.phase_timer = 0;
+            self.boss.active_pattern = None;
+            self.apply_phase_enter_commands();
+        }
+        self.build_render_data();
+        Ok(())
+    }
+
+    fn debug_jump_archmage_phase(&mut self, target: &str) -> Result<(), JsValue> {
+        let (phase_id, hp_ratio, locks) = match target {
+            "opening" => ("opening", 1.0, &[][..]),
+            "single_bird" => ("single_bird", 0.65, &[GeneratorElement::Fire][..]),
+            "dual_guard" => (
+                "dual_guard",
+                0.35,
+                &[GeneratorElement::Fire, GeneratorElement::Ice][..],
+            ),
+            "duel" | "duel_fire" => (
+                "duel",
+                0.20,
+                &[
+                    GeneratorElement::Fire,
+                    GeneratorElement::Fire,
+                    GeneratorElement::Ice,
+                ][..],
+            ),
+            "duel_ice" => (
+                "duel",
+                0.20,
+                &[
+                    GeneratorElement::Ice,
+                    GeneratorElement::Ice,
+                    GeneratorElement::Fire,
+                ][..],
+            ),
+            "finale" | "finale_fire" => (
+                "finale",
+                0.12,
+                &[
+                    GeneratorElement::Fire,
+                    GeneratorElement::Fire,
+                    GeneratorElement::Ice,
+                ][..],
+            ),
+            "finale_ice" => (
+                "finale",
+                0.12,
+                &[
+                    GeneratorElement::Ice,
+                    GeneratorElement::Ice,
+                    GeneratorElement::Fire,
+                ][..],
+            ),
+            _ => return Err(JsValue::from_str("unknown archmage phase preset")),
+        };
+
+        let phase_index = self
+            .phase_lookup
+            .get(phase_id)
+            .copied()
+            .ok_or_else(|| JsValue::from_str("unknown phase"))?;
+
+        self.player.pos_x = self.arena.arena.player_spawn.x;
+        self.player.pos_y = self.arena.arena.player_spawn.y;
+        self.player.hp = PLAYER_MAX_HP;
+        self.player.mp = PLAYER_MAX_MP;
+        self.player.fire_cooldown = 0;
+        self.player.status_mask = 0;
+        self.player.statuses = [status::StatusTimer::default(); MAX_STATUS_SLOTS];
+        self.player.in_combat_frames = 0;
+
+        self.boss.pos_x = self.arena.arena.boss_spawn.x;
+        self.boss.pos_y = self.arena.arena.boss_spawn.y;
+        self.boss.hp = self.boss.max_hp * hp_ratio;
+        self.boss.status_mask = 0;
+        self.boss.statuses = [status::StatusTimer::default(); MAX_STATUS_SLOTS];
+        self.boss.phase_index = phase_index;
+        self.boss.phase_pattern_counter = 0;
+        self.boss.phase_timer = 0;
+        self.boss.fire_pattern_index = 0;
+        self.boss.ice_pattern_index = 0;
+        self.boss.fire_nuke_index = 0;
+        self.boss.ice_nuke_index = 0;
+        self.boss.neutral_index = 0;
+        self.boss.active_pattern = None;
+        self.boss.stagger_frames = 0;
+        self.boss.support_delay_frames = 0;
+        self.boss.damage_window_frames = 0;
+        self.boss.invulnerable_override = false;
+        self.boss.armored_override = false;
+        self.boss.last_pattern_family = PatternFamily::Neutral;
+        self.boss.last_pattern_nuke = false;
+        self.boss.duel_majority = PatternFamily::Neutral;
+        self.boss.duel_stage = 0;
+        self.boss.helper_gates_damage = false;
+        self.boss.helpers.clear();
+        self.boss.objects.clear();
+        self.boss.pending_helper_respawns.clear();
+        self.boss.enemy_bullets.clear();
+        self.boss.player_shots.clear();
+        self.shake_amplitude = 0.0;
+        self.shake_frames = 0;
+        self.current_message.clear();
+
+        self.debug_set_archmage_locks(locks);
+        self.apply_phase_enter_commands();
+        Ok(())
+    }
+
+    fn debug_set_archmage_locks(&mut self, locks: &[GeneratorElement]) {
+        for index in 0..self.boss.generators.len() {
+            let element = locks.get(index).copied().unwrap_or(GeneratorElement::Fire);
+            self.boss.generators.element[index] = element;
+            self.boss.generators.sealed[index] = index < locks.len();
+            self.boss.generators.vulnerable[index] = false;
+            self.boss.generators.hp[index] = self.boss.generators.max_hp[index];
+        }
+        self.refresh_generator_lock_counts();
     }
 }

@@ -30,6 +30,12 @@ pub const SPRITE_PLAYER_SHOT: u32 = 7;
 pub const SPRITE_EDGE_WALL: u32 = 9;
 pub const SPRITE_GENERATOR_RING: u32 = 13;
 pub const SPRITE_UI_RECT: u32 = 14;
+pub const SPRITE_INFERNO_BIRD: u32 = 16;
+pub const SPRITE_BLIZZARD_BIRD: u32 = 17;
+pub const SPRITE_FIRE_PORTAL: u32 = 18;
+pub const SPRITE_ICE_PORTAL: u32 = 19;
+pub const SPRITE_BOSS_DEAD: u32 = 20;
+pub const ARENA_EDGE_EMITTER_RADIUS: f32 = 11.5;
 
 // --- Rendering ---
 pub const INSTANCE_FLOATS: usize = 16;

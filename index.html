@@ -382,10 +382,12 @@
         font-size: 12px;
         letter-spacing: 0.05em;
         text-transform: uppercase;
+        flex-wrap: wrap;
       }
 
       .fps-pill,
-      .controls-line {
+      .controls-line,
+      .debug-panel {
         border-radius: 999px;
         border: 1px solid rgba(255, 255, 255, 0.14);
         background: rgba(6, 10, 20, 0.72);
@@ -407,6 +409,40 @@
         flex: 1;
         padding: 9px 14px;
         text-align: center;
+      }
+
+      .debug-panel {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        text-transform: none;
+        flex-wrap: wrap;
+      }
+
+      .debug-label {
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding-right: 4px;
+      }
+
+      .debug-button {
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        font: inherit;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 7px 10px;
+        cursor: pointer;
+      }
+
+      .debug-button:hover {
+        background: rgba(255, 255, 255, 0.14);
       }
 
       @media (max-width: 1100px) {
@@ -475,6 +511,15 @@
           <div class="underbar">
             <div id="timer-pill" class="fps-pill timer-pill">00:00.00</div>
             <div id="fps-pill" class="fps-pill">FPS 60</div>
+            <div id="debug-panel" class="debug-panel">
+              <span class="debug-label">Debug</span>
+              <button class="debug-button" type="button" data-phase-jump="opening">Opening</button>
+              <button class="debug-button" type="button" data-phase-jump="single_bird">Single Bird</button>
+              <button class="debug-button" type="button" data-phase-jump="dual_guard">Dual Guard</button>
+              <button class="debug-button" type="button" data-phase-jump="duel_fire">Duel Fire</button>
+              <button class="debug-button" type="button" data-phase-jump="finale_fire">Finale Fire</button>
+              <button class="debug-button" type="button" data-phase-jump="finale_ice">Finale Ice</button>
+            </div>
             <div class="controls-line">WASD Move  ·  Mouse Aim  ·  Q / E Rotate  ·  Wheel Zoom  ·  Hold LMB Fire</div>
           </div>
         </div>

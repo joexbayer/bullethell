@@ -37,6 +37,7 @@ async function boot() {
   const menuTitle = document.querySelector<HTMLDivElement>("#menu-title");
   const menuCopy = document.querySelector<HTMLParagraphElement>("#menu-copy");
   const startButton = document.querySelector<HTMLButtonElement>("#start-button");
+  const phaseJumpButtons = document.querySelectorAll<HTMLButtonElement>("[data-phase-jump]");
   if (
     !canvas ||
     !bossName ||
@@ -66,7 +67,7 @@ async function boot() {
   const wasm = await init(wasmUrl);
   const [contentResponse] = await Promise.all([fetch(import.meta.env.BASE_URL + "content.bin")]);
   const contentBlob = new Uint8Array(await contentResponse.arrayBuffer());
-  const atlas = createAtlas();
+  const atlas = await createAtlas();
   const renderer = new Renderer(canvas, atlas, wasm.memory as WebAssembly.Memory);
   const input = new InputController(canvas);
 
@@ -134,6 +135,20 @@ async function boot() {
     syncMenu();
   };
 
+  const beginDebugPhase = (target: string, now: number) => {
+    debug_command({ type: "JumpPhase", payload: target });
+    latestMeta = null;
+    previousMeta = null;
+    accumulator = 0;
+    runState = "running";
+    runStartAt = now;
+    runElapsedMs = 0;
+    lastPrompt = "";
+    lastPromptAt = -30_000;
+    resetHudCache();
+    syncMenu();
+  };
+
   const failRun = () => {
     runState = "ready";
     load_encounter(ENCOUNTER_ID);
@@ -149,6 +164,13 @@ async function boot() {
   };
 
   startButton.addEventListener("click", () => beginRun(performance.now()));
+  phaseJumpButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = button.dataset.phaseJump;
+      if (!target) return;
+      beginDebugPhase(target, performance.now());
+    });
+  });
   syncMenu();
 
   const updateHud = (meta: FrameMeta, now: number) => {

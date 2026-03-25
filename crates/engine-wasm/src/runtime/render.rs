@@ -1,4 +1,4 @@
-use schema::{GeneratorElement, STATUS_EXPOSED, STATUS_SICK, STATUS_SLOW};
+use schema::{EmitterSource, GeneratorElement, PatternFamily, STATUS_EXPOSED, STATUS_SICK, STATUS_SLOW};
 
 use crate::constants::*;
 use crate::runtime::Runtime;
@@ -17,6 +17,7 @@ impl Runtime {
         self.instances.reserve(estimated * INSTANCE_FLOATS);
         self.render_tiles();
         self.render_generators();
+        self.render_arena_portals();
         self.render_enemy_bullets();
         self.render_player_shots();
         self.render_helpers();
@@ -115,9 +116,7 @@ impl Runtime {
                 self.boss.generators.radius[index] * 2.0 * core_scale,
                 45.0,
                 SPRITE_GENERATOR_CORE,
-                if self.boss.generators.vulnerable[index]
-                    && !self.boss.generators.sealed[index]
-                {
+                if self.boss.generators.vulnerable[index] && !self.boss.generators.sealed[index] {
                     [base_color[0], base_color[1], base_color[2], 1.0]
                 } else {
                     [
@@ -234,6 +233,151 @@ impl Runtime {
         }
     }
 
+    fn render_arena_portals(&mut self) {
+        let active_pattern = self.boss.active_pattern.clone();
+        let family = active_pattern
+            .as_ref()
+            .map(|active| self.patterns[active.pattern_index].family)
+            .unwrap_or(self.boss.last_pattern_family);
+        let mut top_active = false;
+        let mut bottom_active = false;
+        let mut left_active = false;
+        let mut right_active = false;
+        let mut top_primed = false;
+        let mut bottom_primed = false;
+        let mut left_primed = false;
+        let mut right_primed = false;
+        let base_color = arena_portal_base_color(family);
+        let mut top_color = base_color;
+        let mut bottom_color = base_color;
+        let mut left_color = base_color;
+        let mut right_color = base_color;
+
+        if let Some(active) = active_pattern {
+            let emitters = self.patterns[active.pattern_index].emitters.clone();
+            let frame = active.frame;
+            for emitter in emitters {
+                let (active_flag, primed_flag, color_slot) = match emitter.source {
+                    EmitterSource::ArenaTop => (&mut top_active, &mut top_primed, &mut top_color),
+                    EmitterSource::ArenaBottom => {
+                        (&mut bottom_active, &mut bottom_primed, &mut bottom_color)
+                    }
+                    EmitterSource::ArenaLeft => (&mut left_active, &mut left_primed, &mut left_color),
+                    EmitterSource::ArenaRight => (&mut right_active, &mut right_primed, &mut right_color),
+                    _ => continue,
+                };
+                let archetype = &self.bullet_archetypes[self.bullet_lookup[&emitter.bullet_id]];
+                *color_slot = [archetype.color_rgba[0], archetype.color_rgba[1], archetype.color_rgba[2]];
+                if frame >= emitter.start_frame && frame <= emitter.end_frame {
+                    *active_flag = true;
+                } else if frame + 18 >= emitter.start_frame {
+                    *primed_flag = true;
+                }
+            }
+        }
+
+        self.push_arena_portal(
+            EmitterSource::ArenaTop,
+            family,
+            top_color,
+            top_active,
+            top_primed,
+        );
+        self.push_arena_portal(
+            EmitterSource::ArenaBottom,
+            family,
+            bottom_color,
+            bottom_active,
+            bottom_primed,
+        );
+        self.push_arena_portal(
+            EmitterSource::ArenaLeft,
+            family,
+            left_color,
+            left_active,
+            left_primed,
+        );
+        self.push_arena_portal(
+            EmitterSource::ArenaRight,
+            family,
+            right_color,
+            right_active,
+            right_primed,
+        );
+    }
+
+    fn push_arena_portal(
+        &mut self,
+        source: EmitterSource,
+        family: PatternFamily,
+        color: [f32; 3],
+        active: bool,
+        primed: bool,
+    ) {
+        let Some((x, y, rotation_deg)) = self.arena_portal_transform(source) else {
+            return;
+        };
+        let pulse = if active {
+            1.0 + (self.frame as f32 / 8.0).sin() * 0.08
+        } else if primed {
+            1.0 + (self.frame as f32 / 12.0).sin() * 0.04
+        } else {
+            1.0
+        };
+        let ring_alpha = if active {
+            0.26
+        } else if primed {
+            0.12
+        } else {
+            0.04
+        };
+        let portal_alpha = if active {
+            0.95
+        } else if primed {
+            0.62
+        } else {
+            0.34
+        };
+        let glow = if active {
+            0.18
+        } else if primed {
+            0.08
+        } else {
+            0.02
+        };
+
+        push_instance(
+            &mut self.instances,
+            x,
+            y,
+            2.35 * pulse,
+            2.35 * pulse,
+            self.frame as f32 * if active { 1.6 } else { 0.6 },
+            SPRITE_RING,
+            [color[0], color[1], color[2], ring_alpha],
+            0.92,
+            1.0,
+            0.0,
+            glow * 1.4,
+            1.0,
+        );
+        push_instance(
+            &mut self.instances,
+            x,
+            y,
+            1.8 * pulse,
+            1.8 * pulse,
+            rotation_deg,
+            arena_portal_sprite(family),
+            [color[0], color[1], color[2], portal_alpha],
+            0.94,
+            1.0,
+            0.0,
+            glow,
+            0.0,
+        );
+    }
+
     fn render_player_shots(&mut self) {
         for index in 0..self.boss.player_shots.len() {
             push_instance(
@@ -260,11 +404,12 @@ impl Runtime {
             let hx = self.boss.helpers.pos_x[index];
             let hy = self.boss.helpers.pos_y[index];
             let c = self.boss.helpers.color_rgba[index];
-            let hp_ratio = (self.boss.helpers.hp[index] / self.boss.helpers.max_hp[index])
-                .clamp(0.0, 1.0);
+            let hp_ratio =
+                (self.boss.helpers.hp[index] / self.boss.helpers.max_hp[index]).clamp(0.0, 1.0);
             let transition_alpha = match self.boss.helpers.transition_state[index] {
                 ENTITY_STATE_SPAWNING => {
-                    1.0 - self.boss.helpers.transition_frames[index] as f32 / HELPER_SPAWN_FRAMES as f32
+                    1.0 - self.boss.helpers.transition_frames[index] as f32
+                        / HELPER_SPAWN_FRAMES as f32
                 }
                 ENTITY_STATE_DESPAWNING => {
                     self.boss.helpers.transition_frames[index] as f32 / HELPER_DESPAWN_FRAMES as f32
@@ -293,7 +438,12 @@ impl Runtime {
                     r * 4.0 * pulse * transition_scale,
                     self.frame as f32 * 2.5,
                     SPRITE_GENERATOR_RING,
-                    [ring_color[0], ring_color[1], ring_color[2], ring_color[3] * transition_alpha],
+                    [
+                        ring_color[0],
+                        ring_color[1],
+                        ring_color[2],
+                        ring_color[3] * transition_alpha,
+                    ],
                     2.97,
                     1.0,
                     0.0,
@@ -322,26 +472,39 @@ impl Runtime {
             // Enemy: solid background square so it reads as a unit, not a bullet
             push_instance(
                 &mut self.instances,
-                hx, hy,
-                r * 3.6 * transition_scale, r * 3.6 * transition_scale,
+                hx,
+                hy,
+                r * 3.6 * transition_scale,
+                r * 3.6 * transition_scale,
                 0.0,
                 SPRITE_BOSS,
-                [c[0] * 0.22, c[1] * 0.22, c[2] * 0.22, 0.90 * transition_alpha],
+                [
+                    c[0] * 0.22,
+                    c[1] * 0.22,
+                    c[2] * 0.22,
+                    0.90 * transition_alpha,
+                ],
                 2.98,
-                1.0, 0.0,
-                0.0, 0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
             );
             // Sprite on top
             push_instance(
                 &mut self.instances,
-                hx, hy,
-                r * 2.8 * transition_scale, r * 2.8 * transition_scale,
+                hx,
+                hy,
+                r * 2.8 * transition_scale,
+                r * 2.8 * transition_scale,
                 self.boss.helpers.angle_deg[index],
                 self.boss.helpers.sprite[index],
                 [c[0], c[1], c[2], c[3] * transition_alpha],
                 3.0,
-                1.0, 0.0,
-                0.0, 0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
             );
 
             // HP bar: rotates with camera, always below entity in screen space
@@ -358,14 +521,18 @@ impl Runtime {
                 let bar_rot = -self.world_rotation_deg;
                 push_instance(
                     &mut self.instances,
-                    bar_x, bar_y,
-                    bar_width, bar_height,
+                    bar_x,
+                    bar_y,
+                    bar_width,
+                    bar_height,
                     bar_rot,
                     SPRITE_UI_RECT,
                     [0.08, 0.09, 0.12, 0.96],
                     3.06,
-                    1.0, 0.0,
-                    0.0, 0.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
                 );
                 let fill_width = bar_inner * hp_ratio;
                 if fill_width > 0.0 {
@@ -374,14 +541,18 @@ impl Runtime {
                     let fill_y = bar_y - sin_t * shift;
                     push_instance(
                         &mut self.instances,
-                        fill_x, fill_y,
-                        fill_width, bar_height - 0.04,
+                        fill_x,
+                        fill_y,
+                        fill_width,
+                        bar_height - 0.04,
                         bar_rot,
                         SPRITE_UI_RECT,
                         [0.18, 0.92, 0.40, 1.0],
                         3.07,
-                        1.0, 0.0,
-                        0.0, 0.0,
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0,
                     );
                 }
             }
@@ -394,11 +565,12 @@ impl Runtime {
             let ox = self.boss.objects.pos_x[index];
             let oy = self.boss.objects.pos_y[index];
             let c = self.boss.objects.color_rgba[index];
-            let hp_ratio = (self.boss.objects.hp[index] / self.boss.objects.max_hp[index])
-                .clamp(0.0, 1.0);
+            let hp_ratio =
+                (self.boss.objects.hp[index] / self.boss.objects.max_hp[index]).clamp(0.0, 1.0);
             let transition_alpha = match self.boss.objects.transition_state[index] {
                 ENTITY_STATE_SPAWNING => {
-                    1.0 - self.boss.objects.transition_frames[index] as f32 / OBJECT_SPAWN_FRAMES as f32
+                    1.0 - self.boss.objects.transition_frames[index] as f32
+                        / OBJECT_SPAWN_FRAMES as f32
                 }
                 ENTITY_STATE_DESPAWNING => {
                     self.boss.objects.transition_frames[index] as f32 / OBJECT_DESPAWN_FRAMES as f32
@@ -415,25 +587,38 @@ impl Runtime {
             // Enemy: solid background
             push_instance(
                 &mut self.instances,
-                ox, oy,
-                r * 3.6 * transition_scale, r * 3.6 * transition_scale,
+                ox,
+                oy,
+                r * 3.6 * transition_scale,
+                r * 3.6 * transition_scale,
                 45.0,
                 SPRITE_BOSS,
-                [c[0] * 0.22, c[1] * 0.22, c[2] * 0.22, 0.90 * transition_alpha],
+                [
+                    c[0] * 0.22,
+                    c[1] * 0.22,
+                    c[2] * 0.22,
+                    0.90 * transition_alpha,
+                ],
                 3.28,
-                1.0, 0.0,
-                0.0, 0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
             );
             push_instance(
                 &mut self.instances,
-                ox, oy,
-                r * 2.8 * transition_scale, r * 2.8 * transition_scale,
+                ox,
+                oy,
+                r * 2.8 * transition_scale,
+                r * 2.8 * transition_scale,
                 self.boss.objects.angle_deg[index],
                 self.boss.objects.sprite[index],
                 [c[0], c[1], c[2], c[3] * transition_alpha],
                 3.3,
-                1.0, 0.0,
-                0.0, 0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
             );
 
             // HP bar: rotates with camera, always below entity in screen space
@@ -449,14 +634,18 @@ impl Runtime {
             let bar_rot = -self.world_rotation_deg;
             push_instance(
                 &mut self.instances,
-                bar_x, bar_y,
-                bar_width, bar_height,
+                bar_x,
+                bar_y,
+                bar_width,
+                bar_height,
                 bar_rot,
                 SPRITE_UI_RECT,
                 [0.06, 0.09, 0.07, 0.98],
                 3.34,
-                1.0, 0.0,
-                0.0, 0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
             );
             let fill_width = bar_inner * hp_ratio;
             if fill_width > 0.0 {
@@ -465,14 +654,18 @@ impl Runtime {
                 let fill_y = bar_y - sin_t * shift;
                 push_instance(
                     &mut self.instances,
-                    fill_x, fill_y,
-                    fill_width, bar_height - 0.05,
+                    fill_x,
+                    fill_y,
+                    fill_width,
+                    bar_height - 0.05,
                     bar_rot,
                     SPRITE_UI_RECT,
                     [0.14, 0.96, 0.28, 1.0],
                     3.35,
-                    1.0, 0.0,
-                    0.0, 0.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
                 );
             }
         }
@@ -542,7 +735,11 @@ impl Runtime {
             self.boss.radius * 2.6,
             self.boss.radius * 2.6,
             0.0,
-            SPRITE_BOSS,
+            if self.boss.hp <= 0.0 {
+                SPRITE_BOSS_DEAD
+            } else {
+                SPRITE_BOSS
+            },
             [0.42, 0.24, 0.60, 1.0],
             4.0,
             1.0,
@@ -666,6 +863,47 @@ impl Runtime {
                 );
             }
         }
+    }
+
+    fn arena_portal_transform(&self, source: EmitterSource) -> Option<(f32, f32, f32)> {
+        match source {
+            EmitterSource::ArenaTop => Some((
+                self.boss.pos_x,
+                self.boss.pos_y - ARENA_EDGE_EMITTER_RADIUS,
+                90.0,
+            )),
+            EmitterSource::ArenaBottom => Some((
+                self.boss.pos_x,
+                self.boss.pos_y + ARENA_EDGE_EMITTER_RADIUS,
+                -90.0,
+            )),
+            EmitterSource::ArenaLeft => Some((
+                self.boss.pos_x - ARENA_EDGE_EMITTER_RADIUS,
+                self.boss.pos_y,
+                180.0,
+            )),
+            EmitterSource::ArenaRight => Some((
+                self.boss.pos_x + ARENA_EDGE_EMITTER_RADIUS,
+                self.boss.pos_y,
+                0.0,
+            )),
+            _ => None,
+        }
+    }
+}
+
+fn arena_portal_sprite(family: PatternFamily) -> u32 {
+    match family {
+        PatternFamily::Fire | PatternFamily::Neutral => SPRITE_FIRE_PORTAL,
+        PatternFamily::Ice => SPRITE_ICE_PORTAL,
+    }
+}
+
+fn arena_portal_base_color(family: PatternFamily) -> [f32; 3] {
+    match family {
+        PatternFamily::Fire => [1.0, 0.54, 0.24],
+        PatternFamily::Ice => [0.66, 0.90, 1.0],
+        PatternFamily::Neutral => [0.84, 0.78, 0.92],
     }
 }
 

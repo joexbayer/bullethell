@@ -14,7 +14,10 @@ impl Runtime {
         if !self.is_twilight_archmage_regular() {
             return;
         }
-        if !matches!(self.current_phase().id.as_str(), "single_bird" | "dual_guard") {
+        if !matches!(
+            self.current_phase().id.as_str(),
+            "single_bird" | "dual_guard"
+        ) {
             return;
         }
         self.boss.damage_window_frames = SUPPORT_DAMAGE_WINDOW_FRAMES;
@@ -34,7 +37,10 @@ impl Runtime {
             self.boss.stagger_frames = crate::constants::STAGGER_FRAMES_DEFAULT;
             return;
         }
-        if !matches!(self.current_phase().id.as_str(), "single_bird" | "dual_guard") {
+        if !matches!(
+            self.current_phase().id.as_str(),
+            "single_bird" | "dual_guard"
+        ) {
             self.boss.stagger_frames = crate::constants::STAGGER_FRAMES_DEFAULT;
             return;
         }
@@ -137,7 +143,10 @@ impl Runtime {
     fn configure_single_bird_pattern(&mut self) {
         match self.boss.last_pattern_family {
             PatternFamily::Fire => {
-                self.upsert_helper(self.inferno_spawn(false, self.boss.last_pattern_nuke, false), true);
+                self.upsert_helper(
+                    self.inferno_spawn(false, self.boss.last_pattern_nuke, false),
+                    true,
+                );
                 let mut blizzard = self.blizzard_spawn(true, false, false);
                 blizzard.bullet_pattern = None;
                 self.upsert_helper(blizzard, true);
@@ -148,7 +157,10 @@ impl Runtime {
                 };
             }
             PatternFamily::Ice => {
-                self.upsert_helper(self.blizzard_spawn(false, self.boss.last_pattern_nuke, false), true);
+                self.upsert_helper(
+                    self.blizzard_spawn(false, self.boss.last_pattern_nuke, false),
+                    true,
+                );
                 let mut inferno = self.inferno_spawn(true, false, false);
                 inferno.bullet_pattern = None;
                 self.upsert_helper(inferno, true);
@@ -184,20 +196,22 @@ impl Runtime {
     fn configure_seal_two_support(&mut self) {
         match self.boss.last_pattern_family {
             PatternFamily::Fire => {
-                let mut inferno =
-                    self.inferno_spawn(true, self.boss.last_pattern_nuke, false);
-                inferno.bullet_pattern =
-                    self.pattern_lookup.get("inferno_seal_support_pattern").copied();
+                let mut inferno = self.inferno_spawn(true, self.boss.last_pattern_nuke, false);
+                inferno.bullet_pattern = self
+                    .pattern_lookup
+                    .get("inferno_seal_support_pattern")
+                    .copied();
                 let mut blizzard = self.blizzard_spawn(true, false, false);
                 blizzard.bullet_pattern = None;
                 self.upsert_helper(inferno, true);
                 self.upsert_helper(blizzard, true);
             }
             PatternFamily::Ice => {
-                let mut blizzard =
-                    self.blizzard_spawn(true, self.boss.last_pattern_nuke, false);
-                blizzard.bullet_pattern =
-                    self.pattern_lookup.get("blizzard_seal_support_pattern").copied();
+                let mut blizzard = self.blizzard_spawn(true, self.boss.last_pattern_nuke, false);
+                blizzard.bullet_pattern = self
+                    .pattern_lookup
+                    .get("blizzard_seal_support_pattern")
+                    .copied();
                 let mut inferno = self.inferno_spawn(true, false, false);
                 inferno.bullet_pattern = None;
                 self.upsert_helper(blizzard, true);
@@ -270,7 +284,7 @@ impl Runtime {
     fn inferno_spawn(&self, invulnerable: bool, armored: bool, exposed: bool) -> HelperSpawn {
         HelperSpawn {
             ids: "inferno".to_string(),
-            sprite: 10,
+            sprite: SPRITE_INFERNO_BIRD,
             pos_x: self.boss.pos_x + 5.0,
             pos_y: self.boss.pos_y,
             hp: 440.0,
@@ -293,7 +307,7 @@ impl Runtime {
     fn blizzard_spawn(&self, invulnerable: bool, armored: bool, exposed: bool) -> HelperSpawn {
         HelperSpawn {
             ids: "blizzard".to_string(),
-            sprite: 11,
+            sprite: SPRITE_BLIZZARD_BIRD,
             pos_x: self.boss.pos_x + 6.2,
             pos_y: self.boss.pos_y,
             hp: 440.0,
@@ -316,7 +330,7 @@ impl Runtime {
     fn inferno_duel_guard_spawn(&self, invulnerable: bool) -> HelperSpawn {
         HelperSpawn {
             ids: "inferno".to_string(),
-            sprite: 10,
+            sprite: SPRITE_INFERNO_BIRD,
             pos_x: self.boss.pos_x + 3.8,
             pos_y: self.boss.pos_y,
             hp: 380.0,
@@ -339,7 +353,7 @@ impl Runtime {
     fn blizzard_duel_guard_spawn(&self, invulnerable: bool) -> HelperSpawn {
         HelperSpawn {
             ids: "blizzard".to_string(),
-            sprite: 11,
+            sprite: SPRITE_BLIZZARD_BIRD,
             pos_x: self.boss.pos_x + 2.2,
             pos_y: self.boss.pos_y,
             hp: 380.0,
@@ -359,14 +373,10 @@ impl Runtime {
         }
     }
 
-    fn inferno_duel_hunter_spawn(
-        &self,
-        invulnerable: bool,
-        armored: bool,
-    ) -> HelperSpawn {
+    fn inferno_duel_hunter_spawn(&self, invulnerable: bool, armored: bool) -> HelperSpawn {
         HelperSpawn {
             ids: "inferno".to_string(),
-            sprite: 10,
+            sprite: SPRITE_INFERNO_BIRD,
             pos_x: self.boss.pos_x + 5.8,
             pos_y: self.boss.pos_y,
             hp: 380.0,
@@ -376,7 +386,10 @@ impl Runtime {
             orbit_radius: 5.8,
             orbit_speed_deg: 40.0,
             angle_deg: 0.0,
-            bullet_pattern: self.pattern_lookup.get("inferno_duel_finish_pattern").copied(),
+            bullet_pattern: self
+                .pattern_lookup
+                .get("inferno_duel_finish_pattern")
+                .copied(),
             color_rgba: [1.0, 0.56, 0.18, 1.0],
             invulnerable,
             armored,
@@ -386,14 +399,10 @@ impl Runtime {
         }
     }
 
-    fn blizzard_duel_hunter_spawn(
-        &self,
-        invulnerable: bool,
-        armored: bool,
-    ) -> HelperSpawn {
+    fn blizzard_duel_hunter_spawn(&self, invulnerable: bool, armored: bool) -> HelperSpawn {
         HelperSpawn {
             ids: "blizzard".to_string(),
-            sprite: 11,
+            sprite: SPRITE_BLIZZARD_BIRD,
             pos_x: self.boss.pos_x + 5.6,
             pos_y: self.boss.pos_y,
             hp: 380.0,
@@ -403,7 +412,10 @@ impl Runtime {
             orbit_radius: 2.8,
             orbit_speed_deg: -88.0,
             angle_deg: 0.0,
-            bullet_pattern: self.pattern_lookup.get("blizzard_duel_finish_pattern").copied(),
+            bullet_pattern: self
+                .pattern_lookup
+                .get("blizzard_duel_finish_pattern")
+                .copied(),
             color_rgba: [0.72, 0.92, 1.0, 1.0],
             invulnerable,
             armored,
